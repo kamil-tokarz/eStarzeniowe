@@ -1,12 +1,12 @@
 # eStarzeniowe — AI handoff / stan projektu
 
-> Ten dokument jest punktem ciągłości prac nad aplikacją. Aktualizować przy większych checkpointach. GitHub pozostaje źródłem prawdy dla kodu.
+> Ten dokument jest punktem ciągłości prac nad aplikacją. GitHub pozostaje źródłem prawdy dla kodu.
 
 ## Cel
-Pełna, działająca aplikacja webowa JagoPro do obsługi testów stabilności/starzeniowych — nie makieta. Wersja testowa ma działać end-to-end na Docker + PostgreSQL, a docelowo zostać wdrożona na Azure.
+Pełna działająca aplikacja webowa JagoPro do obsługi testów stabilności/starzeniowych. Wersja testowa: Docker + PostgreSQL; docelowo Azure.
 
 ## Kierunek UX/UI
-JagoPro Premium Light UI: biel, bardzo jasne szarości, turkus JagoPro, dużo whitespace, duża hierarchiczna typografia, minimum dekoracji. Czerwony głównie dla NOK/krytycznych problemów, pomarańczowy dla zaległości. Dashboard Technologa ma przypominać interaktywny executive-summary slide, nie generyczny panel ERP/admin.
+JagoPro Premium Light UI: biel, jasne szarości, turkus JagoPro, dużo whitespace, mocna hierarchia typografii. Czerwony dla NOK/krytycznych problemów, pomarańczowy dla zaległości. Dashboard Technologa ma wyglądać jak interaktywny executive-summary, nie generyczny ERP.
 
 ## Role
 - Technolog
@@ -15,40 +15,34 @@ JagoPro Premium Light UI: biel, bardzo jasne szarości, turkus JagoPro, dużo wh
 
 Technolog widzi wszystkie zlecenia. Laboranci pracują we wspólnej puli. Administrator zarządza użytkownikami, klientami, standardami i słownikami.
 
-## Główne statusy badania
+## Statusy badania
 - DRAFT / Robocze
 - ACTIVE / W realizacji
 - COMPLETED / Zakończone
-- CANCELLED / Anulowane (tylko z DRAFT, powód obowiązkowy)
-- INTERRUPTED / Przerwane (tylko z ACTIVE, powód obowiązkowy, bez wznowienia)
+- CANCELLED / Anulowane
+- INTERRUPTED / Przerwane
 
-## Najważniejsze reguły domenowe
-- Numer badania: `ES-RRRR-NNNN`, unikalny, roczna sekwencja, anulowane numery nie wracają.
-- Standard stabilności definiuje tylko fizyczny plan próbek i stałe offsety dni od daty rozpoczęcia.
-- Kryteria akceptacji wybiera Technolog per zlecenie; zakres zamraża się przy przekazaniu do Laboratorium.
-- W ACTIVE Technolog może zmieniać wartość istniejącego kryterium z obowiązkowym uzasadnieniem i wersjonowaniem; historyczne wyniki zachowują ocenę pierwotną, a bieżąca ocena jest przeliczana.
-- Przekazanie do Laboratorium generuje fizyczne próbki i zamraża konfigurację.
-- Data rozpoczęcia może być późniejsza od przekazania, ale nie wcześniejsza.
-- Każda próbka ma badania wstępne: waga zawsze, ciśnienie dla aerozolu. Wynik albo `Nie wykonano + powód`.
-- Wszystkie badania wstępne całego badania muszą być kompletne przed badaniami właściwymi.
-- Normalna próbka: waga bieżąca, ciśnienie bieżące dla aerozolu oraz wszystkie wybrane kryteria.
-- Pusty wymagany wynik blokuje kompletność; NOK nie blokuje kompletności.
-- Mikrobiologia: jedna zbiorcza ocena OK/NOK dla próbki mikro + opcjonalny raport.
-- RF/REF = próbka referencyjna / OOS backup, nie checkpoint czasowy.
-- RF generowana przy przekazaniu, ma badania wstępne, ale brak terminu/sprintu. Niewykorzystana RF nie blokuje zakończenia i nie wchodzi do zwykłego progressu.
-- Przy konkretnym NOK Technolog może wybrać `Użyj próbki referencyjnej`; wynik RF jest osobnym wynikiem połączonym ze źródłowym NOK, bez nadpisywania historii.
-- Sprint jest liczony dynamicznie jako tydzień poniedziałek–niedziela zawierający datę nominalną; brak osobnej encji sprintu.
-- Laboratorium ma dwa równorzędne tryby: po badaniu (batch) i po próbce.
-- Zapis wyników jest jawny (`Zapisz wyniki`), bez autosave.
-- Optimistic concurrency per pojedynczy wynik; brak locka całej próbki/formularza.
-- Batch save zapisuje poprawne rekordy, a konflikty/błędy raportuje osobno.
-- Badanie kończy się automatycznie, gdy wszystkie wymagane próbki (bez niewykorzystanych RF) są kompletne.
+## Najważniejsze reguły
+- Numer `ES-RRRR-NNNN`, unikalna roczna sekwencja, anulowane numery nie wracają.
+- Standard definiuje tylko fizyczny plan próbek i stałe offsety dni.
+- Kryteria wybiera Technolog per zlecenie; zakres zamraża się przy przekazaniu.
+- W ACTIVE wartość istniejącego kryterium może być wersjonowana z uzasadnieniem; ocena bieżąca wyników jest przeliczana, pierwotna zachowana.
+- Przekazanie generuje próbki i blokuje konfigurację.
+- Każda próbka ma badania wstępne: waga zawsze, ciśnienie dla aerozolu.
+- Wszystkie badania wstępne muszą być kompletne przed badaniami właściwymi.
+- Normalna próbka: waga, ciśnienie dla aerozolu i wszystkie wybrane kryteria.
+- `Nie wykonano` wymaga powodu. NOK nie blokuje kompletności.
+- Mikrobiologia: jeden zbiorczy OK/NOK + opcjonalny raport.
+- RF/REF to backup OOS; brak terminu/sprintu; niewykorzystany RF nie blokuje zakończenia.
+- Laboratorium ma dwa równorzędne tryby: po badaniu i po próbce.
+- Jawny zapis wyników, optimistic concurrency per wynik, częściowy batch save.
+- Badanie kończy się automatycznie po komplecie wymaganych próbek bez niewykorzystanych RF.
 
 ## Technologia
 - Next.js + TypeScript
 - PostgreSQL
 - Prisma
-- lokalne konta użytkowników
+- lokalne konta
 - Docker / Docker Compose
 - docelowo Azure
 
@@ -57,78 +51,53 @@ Technolog widzi wszystkie zlecenia. Laboranci pracują we wspólnej puli. Admini
 - `technolog / test`
 - `laborant / test`
 
-`admin/admin` jest wyłącznie dla środowiska testowego i nie może pozostać domyślnym hasłem produkcyjnym.
+## Gałęzie
+- robocza: `feat/bootstrap-mvp`
+- checkpoint CI: `ci/checkpoint`
+- draft PR: #1
 
-## Aktualny stan gałęzi
-Gałąź robocza: `feat/bootstrap-mvp`.
-Draft PR: #1.
+CI nie uruchamia się przy każdym commicie roboczym. Pełny test uruchamiany jest tylko na większych checkpointach przez przesunięcie `ci/checkpoint`.
 
-### Napisane / w dużej części działające
+## Aktualnie napisane
 - fundament Next.js/TypeScript
 - Prisma/PostgreSQL
 - Docker Compose
 - lokalne logowanie i sesje
+- proxy-safe API login/logout pod Codespaces
 - seed danych testowych
-- Dashboard Technologa oparty o dane z bazy
+- Dashboard Technologa z bazy
 - rejestr zleceń
-- tworzenie DRAFT
-- generowanie numeru badania
+- tworzenie DRAFT i numer badania
+- pełna edycja DRAFT przed przekazaniem
 - komponenty i podstawowe kryteria
 - przekazanie do Laboratorium
-- generowanie próbek ze standardu
+- generowanie próbek
 - badania wstępne
-- Laboratorium: po próbce
-- Laboratorium: po badaniu / batch
+- Laboratorium po próbce
+- Laboratorium po badaniu / batch
 - `Nie wykonano + powód`
 - OK/NOK
-- optimistic concurrency wyników
-- częściowy zapis batcha
-- mikrobiologia — podstawowy przepływ
-- auto-completion badania
-- logika RF/OOS — aktywacja dla konkretnego NOK (w trakcie finalnego dopięcia)
-- wersjonowanie wartości kryteriów (w trakcie finalnego dopięcia)
+- optimistic concurrency
+- częściowy batch save
+- podstawowa mikrobiologia
+- auto-completion
+- RF/OOS dla konkretnego NOK
+- wersjonowanie wartości kryteriów
 - przerwanie badania
+- Administracja: użytkownicy, klienci, standardy, słowniki
+- standardy: DRAFT → ACTIVE → WITHDRAWN, plan próbek, blokada po pierwszym użyciu
 
-## CI / maile
-CI NIE ma uruchamiać się po każdym commicie na `feat/bootstrap-mvp`.
-Workflow jest skonfigurowany na:
-- push do `main`
-- push do `ci/checkpoint`
-- ręczne workflow_dispatch
+## Pozostało do 100% wersji testowej
+1. Pełny katalog kryteriów i dokładne słowniki z workflow (obecnie formularz wykorzystuje podstawowy zestaw pH/gęstość/wygląd/zapach).
+2. Dokładne standardy produkcyjne z przypisanymi stałymi offsetami dni; stare nazwy są rozpoznane, ale część wymaga jawnych offsetów.
+3. Etykiety A4 4×10.
+4. Załącznik raportu mikrobiologicznego.
+5. Trendy liczbowe.
+6. Eksport Excel + PDF.
+7. Dopracowanie dashboardu/filtrów i Wymaga uwagi.
+8. Testy akceptacyjne end-to-end i polish UX.
+9. Migracje produkcyjne Prisma + finalny pakiet wdrożeniowy Docker/Azure.
+10. Ustabilizowanie testowego podglądu Codespaces; nie blokuje budowy funkcji biznesowych.
 
-Do weryfikacji większej paczki należy przesunąć `ci/checkpoint` na aktualny commit. Dzięki temu użytkownik nie dostaje maila po każdym małym commicie.
-
-## Ostatni znany problem przed checkpointem
-Po dodaniu RF i edycji kryteriów build wykrył 2 błędy TypeScript związane z `.includes(criterion.kind)` dla enum `CriterionKind`. Są to błędy typowania, nie logiki biznesowej. Należy zastąpić w obu miejscach warunek np. jawnym porównaniem:
-
-```ts
-criterion.kind === CriterionKind.RANGE ||
-criterion.kind === CriterionKind.MINIMUM ||
-criterion.kind === CriterionKind.MAXIMUM
-```
-
-Dotyczy:
-- `app/studies/[id]/page.tsx`
-- `app/studies/attention-actions.ts`
-
-## Co pozostało do wersji 100% gotowej do testów
-1. Dopięcie i zielony checkpoint: RF/OOS, wersjonowanie kryteriów, interrupt.
-2. Pełna edycja DRAFT.
-3. Administracja:
-   - użytkownicy
-   - klienci
-   - słowniki
-   - standardy z blokadą po pierwszym użyciu.
-4. Dokładny katalog kryteriów/słowników/mikrobiologii z obecnych workflow JagoPro.
-5. Docelowe standardy z ustalonymi stałymi offsetami dni.
-6. Etykiety A4 4×10, 52.5×29.7 mm, logo JagoPro, actual size.
-7. Załącznik raportu mikrobiologicznego.
-8. Trendy parametrów numerycznych.
-9. Eksport minimum Excel + PDF.
-10. Migracje produkcyjne Prisma zamiast testowego `db push`.
-11. Dopracowanie seed/demo danych do scenariuszy użytkowych.
-12. Testy akceptacyjne end-to-end i polish UX.
-13. Gotowy pakiet wdrożeniowy Docker/Azure + instrukcja dla administratora serwera.
-
-## Zasada pracy z użytkownikiem
-Nie pytać o rzeczy, które można rozsądnie wywnioskować z powyższej logiki. W razie dwóch realnie różnych opcji biznesowych dopiero wtedy poprosić o decyzję. Preferować prostszy proces: „system dla ludzi, nie ludzie dla systemu”.
+## Sposób pracy
+Nie zatrzymywać użytkownika pytaniami technicznymi, jeśli decyzję można rozsądnie wywnioskować. Wątpliwości biznesowe rozstrzygać zgodnie z zasadą: system dla ludzi, nie ludzie dla systemu. Użytkownik chce najpierw gotową aplikację do testów, a dopiero potem poprawki po feedbacku użytkowników.
