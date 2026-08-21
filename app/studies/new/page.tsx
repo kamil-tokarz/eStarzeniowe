@@ -7,9 +7,10 @@ import { StudyForm } from "@/components/study-form";
 
 const criterionDictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind"];
 
-export default async function NewStudyPage() {
+export default async function NewStudyPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const user = await requireUser();
   if (user.role !== UserRole.TECHNOLOGIST && user.role !== UserRole.ADMIN) redirect("/studies");
+  const query = await searchParams;
 
   const [clients, technologists, standards, dictionaries] = await Promise.all([
     prisma.client.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -19,12 +20,9 @@ export default async function NewStudyPage() {
   ]);
 
   const dictionaryValues: Record<string, string[]> = {};
-  for (const entry of dictionaries) {
-    (dictionaryValues[entry.category] ??= []).push(entry.value);
-  }
+  for (const entry of dictionaries) (dictionaryValues[entry.category] ??= []).push(entry.value);
   const microbiologyValues = dictionaryValues.microbiology ?? [];
   const componentKinds = dictionaryValues.component_kind ?? [];
-
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -36,6 +34,8 @@ export default async function NewStudyPage() {
           <div className="subtle">Jedna strona, tylko informacje potrzebne do uruchomienia testów.</div>
         </div>
       </div>
+      {query.error && <div className="form-error" style={{ marginTop: 22 }}>{query.error}</div>}
+      {!standards.length && <div className="form-error" style={{ marginTop: 22 }}>Brak aktywnego standardu badań. Administrator musi najpierw zweryfikować i aktywować standard.</div>}
       <StudyForm
         clients={clients}
         technologists={technologists}
