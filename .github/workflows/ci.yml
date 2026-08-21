@@ -3,10 +3,12 @@ name: eStarzeniowe CI
 on:
   push:
     branches: [main, ci/checkpoint]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: estarzeniowe-ci-${{ github.ref }}
+  group: estarzeniowe-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -44,5 +46,7 @@ jobs:
         run: npx prisma db push
       - name: Seed test data
         run: npx prisma db seed
+      - name: Lint application
+        run: npm run lint
       - name: Build application
         run: npm run build
