@@ -5,17 +5,24 @@ import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/app-shell";
 import { StudyForm } from "@/components/study-form";
 
+const criterionDictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology"];
+
 export default async function NewStudyPage() {
   const user = await requireUser();
   if (user.role !== UserRole.TECHNOLOGIST && user.role !== UserRole.ADMIN) redirect("/studies");
 
-  const [clients, technologists, standards, appearanceValues, odorValues] = await Promise.all([
+  const [clients, technologists, standards, dictionaries] = await Promise.all([
     prisma.client.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.user.findMany({ where: { active: true, role: UserRole.TECHNOLOGIST }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.stabilityStandard.findMany({ where: { status: StandardStatus.ACTIVE }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.dictionaryEntry.findMany({ where: { category: "appearance", active: true }, orderBy: { sortOrder: "asc" }, select: { value: true } }),
-    prisma.dictionaryEntry.findMany({ where: { category: "odor", active: true }, orderBy: { sortOrder: "asc" }, select: { value: true } }),
+    prisma.dictionaryEntry.findMany({ where: { category: { in: criterionDictionaryCategories }, active: true }, orderBy: [{ category: "asc" }, { sortOrder: "asc" }] }),
   ]);
+
+  const dictionaryValues: Record<string, string[]> = {};
+  for (const entry of dictionaries) {
+    (dictionaryValues[entry.category] ??= []).push(entry.value);
+  }
+  const microbiologyValues = dictionaryValues.microbiology ?? [];
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -32,8 +39,8 @@ export default async function NewStudyPage() {
         clients={clients}
         technologists={technologists}
         standards={standards}
-        appearanceValues={appearanceValues}
-        odorValues={odorValues}
+        dictionaryValues={dictionaryValues}
+        microbiologyValues={microbiologyValues}
         defaultTechnologistId={user.role === UserRole.TECHNOLOGIST ? user.id : technologists[0]?.id ?? ""}
         today={today}
       />
