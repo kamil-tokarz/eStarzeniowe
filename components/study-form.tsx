@@ -1,32 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { createStudyAction } from "@/app/studies/actions";
+import { criterionCatalog, criterionGroups } from "@/lib/criterion-catalog";
 
 type Option = { id: string; name: string };
-type DictionaryOption = { value: string };
 
 export function StudyForm({
   clients,
   technologists,
   standards,
-  appearanceValues,
-  odorValues,
+  dictionaryValues,
+  microbiologyValues,
   defaultTechnologistId,
   today,
 }: {
   clients: Option[];
   technologists: Option[];
   standards: Option[];
-  appearanceValues: DictionaryOption[];
-  odorValues: DictionaryOption[];
+  dictionaryValues: Record<string, string[]>;
+  microbiologyValues: string[];
   defaultTechnologistId: string;
   today: string;
 }) {
   const [aerosol, setAerosol] = useState(true);
 
   return (
-    <form action={createStudyAction} className="study-form">
+    <form method="post" action="/api/studies" className="study-form">
       <section className="form-section">
         <div className="form-section-head"><span className="step-number">01</span><div><h2>Projekt i odpowiedzialność</h2><p>Podstawowe dane identyfikujące badanie.</p></div></div>
         <div className="form-grid form-grid-2">
@@ -53,25 +52,64 @@ export function StudyForm({
       </section>
 
       <section className="form-section">
-        <div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Najważniejsze elementy produktu i opakowania.</p></div></div>
+        <div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Elementy produktu i opakowania. Puste wiersze zostaną pominięte.</p></div></div>
         <div className="component-table">
           <div className="component-row component-head"><span>Rodzaj</span><span>Kod</span><span>Nazwa</span><span>Dostawca</span></div>
-          {[1, 2, 3].map((index) => <div className="component-row" key={index}><input name={`componentKind_${index}`} placeholder="np. Pojemnik" /><input name={`componentCode_${index}`} placeholder="Kod" /><input name={`componentName_${index}`} placeholder="Nazwa komponentu" /><input name={`componentSupplier_${index}`} placeholder="Dostawca" /></div>)}
+          {[1, 2, 3, 4, 5].map((index) => <div className="component-row" key={index}><input name={`componentKind_${index}`} placeholder="np. Pojemnik" /><input name={`componentCode_${index}`} placeholder="Kod" /><input name={`componentName_${index}`} placeholder="Nazwa komponentu" /><input name={`componentSupplier_${index}`} placeholder="Dostawca" /></div>)}
         </div>
       </section>
 
       <section className="form-section">
-        <div className="form-section-head"><span className="step-number">04</span><div><h2>Kryteria akceptacji</h2><p>Zakres badań zostanie zamrożony po przekazaniu do Laboratorium.</p></div></div>
-        <div className="criteria-grid">
-          <div className="criterion-card"><label className="criterion-toggle"><input name="criterion_PH" type="checkbox" defaultChecked /><span><strong>pH</strong><small>Zakres liczbowy</small></span></label><div className="criterion-range"><input name="PH_min" type="number" step="0.01" defaultValue="5.5" aria-label="pH minimum" /><span>–</span><input name="PH_max" type="number" step="0.01" defaultValue="6.5" aria-label="pH maksimum" /></div></div>
-          <div className="criterion-card"><label className="criterion-toggle"><input name="criterion_DENSITY" type="checkbox" defaultChecked /><span><strong>Gęstość</strong><small>Zakres liczbowy [g/ml]</small></span></label><div className="criterion-range"><input name="DENSITY_min" type="number" step="0.001" defaultValue="0.85" aria-label="Gęstość minimum" /><span>–</span><input name="DENSITY_max" type="number" step="0.001" defaultValue="1.05" aria-label="Gęstość maksimum" /></div></div>
-          <div className="criterion-card"><label className="criterion-toggle"><input name="criterion_APPEARANCE" type="checkbox" defaultChecked /><span><strong>Wygląd</strong><small>Wartość oczekiwana</small></span></label><select name="APPEARANCE_expected" defaultValue={appearanceValues[0]?.value ?? "Bez zmian"}>{appearanceValues.map((item) => <option key={item.value}>{item.value}</option>)}</select></div>
-          <div className="criterion-card"><label className="criterion-toggle"><input name="criterion_ODOR" type="checkbox" defaultChecked /><span><strong>Zapach</strong><small>Wartość oczekiwana</small></span></label><select name="ODOR_expected" defaultValue={odorValues[0]?.value ?? "Bez zmian"}>{odorValues.map((item) => <option key={item.value}>{item.value}</option>)}</select></div>
+        <div className="form-section-head"><span className="step-number">04</span><div><h2>Kryteria akceptacji</h2><p>Wybierasz zakres właściwy dla produktu. Po przekazaniu do Laboratorium zakres zostanie zamrożony.</p></div></div>
+        <div className="criteria-sections">
+          {criterionGroups.map((group) => (
+            <div className="criteria-group" key={group}>
+              <div className="criteria-group-title">{group}</div>
+              <div className="criteria-grid">
+                {criterionCatalog.filter((item) => item.group === group).map((item) => {
+                  const dictionary = item.dictionaryKey ? dictionaryValues[item.dictionaryKey] ?? [] : [];
+                  return (
+                    <div className="criterion-card" key={item.code}>
+                      <label className="criterion-toggle">
+                        <input name={`criterion_${item.code}`} type="checkbox" defaultChecked={item.defaultChecked} />
+                        <span><strong>{item.label}</strong><small>{item.unit ? `${item.input === "minimum" ? "minimum" : "zakres"} · ${item.unit}` : item.input === "boolean" ? "wykonanie / zgodność" : item.input === "expected" ? "wartość oczekiwana" : "kryterium"}</small></span>
+                      </label>
+
+                      {item.input === "range" && <div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" defaultValue={item.defaultMin ?? ""} placeholder="min" aria-label={`${item.label} minimum`} /><span>–</span><input name={`${item.code}_max`} type="number" step="any" defaultValue={item.defaultMax ?? ""} placeholder="max" aria-label={`${item.label} maksimum`} /></div>}
+                      {item.input === "minimum" && <input name={`${item.code}_min`} type="number" step="any" placeholder={`Minimum${item.unit ? ` [${item.unit}]` : ""}`} aria-label={`${item.label} minimum`} />}
+                      {item.input === "expected" && <select name={`${item.code}_expected`} defaultValue={item.defaultExpected ?? dictionary[0] ?? ""}><option value="" disabled>Wybierz wartość</option>{dictionary.map((value) => <option key={value} value={value}>{value}</option>)}</select>}
+                      {item.input === "boolean" && <div className="criterion-info">Po wybraniu Laboratorium otrzyma obowiązkowe pole TAK/NIE; oczekiwana wartość: TAK.</div>}
+                      {item.input === "crimp" && <div className="crimp-config"><select name={`${item.code}_preset`} defaultValue={dictionary[0] ?? ""}><option value="" disabled>Wybierz konfigurację materiałową</option>{dictionary.map((value) => <option key={value} value={value}>{value}</option>)}</select><div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" placeholder="min dla INNE" /><span>–</span><input name={`${item.code}_max`} type="number" step="any" placeholder="max dla INNE" /></div></div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <div className="criteria-group">
+            <div className="criteria-group-title">Zawartość substancji</div>
+            <p className="subtle">Każdy wiersz tworzy osobne badanie z własnym zakresem i pełną oceną OK/NOK.</p>
+            <div className="substance-table">
+              <div className="substance-row substance-head"><span>Substancja</span><span>Minimum [%]</span><span>Maksimum [%]</span></div>
+              {[1, 2, 3, 4, 5].map((index) => <div className="substance-row" key={index}><input name={`substanceName_${index}`} placeholder="np. Etanol" /><input name={`substanceMin_${index}`} type="number" step="any" placeholder="min" /><input name={`substanceMax_${index}`} type="number" step="any" placeholder="max" /></div>)}
+            </div>
+          </div>
         </div>
       </section>
 
       <section className="form-section">
-        <div className="form-section-head"><span className="step-number">05</span><div><h2>Standard stabilności</h2><p>Standard definiuje wyłącznie fizyczny plan próbek i terminy.</p></div></div>
+        <div className="form-section-head"><span className="step-number">05</span><div><h2>Mikrobiologia</h2><p>Opcjonalny zakres przekazywany do laboratorium zewnętrznego. W systemie wróci jedna zbiorcza ocena OK/NOK i opcjonalny raport.</p></div></div>
+        <details className="micro-scope">
+          <summary>Wybierz badania mikrobiologiczne <span>{microbiologyValues.length} pozycji w katalogu</span></summary>
+          <div className="micro-grid">
+            {microbiologyValues.map((value) => <label className="micro-option" key={value}><input type="checkbox" name="microTests" value={value} /><span>{value}</span></label>)}
+          </div>
+        </details>
+      </section>
+
+      <section className="form-section">
+        <div className="form-section-head"><span className="step-number">06</span><div><h2>Standard stabilności</h2><p>Standard definiuje wyłącznie fizyczny plan próbek, warunki przechowywania i stałe offsety dni.</p></div></div>
         <label className="field field-wide">Standard *<select name="standardId" required defaultValue={standards[0]?.id ?? ""}>{standards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       </section>
 
