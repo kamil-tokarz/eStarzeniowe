@@ -1,6 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, SampleRole, StandardStatus, TestValueType } from "../generated/prisma/client";
-import { importedStandardPlans } from "./imported-standard-plans";
+import { PrismaClient, TestValueType } from "../generated/prisma/client";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required for extra seed");
@@ -170,12 +169,6 @@ const dictionaries: Record<string, string[]> = {
 
 const sourceDictionaryCategories = Object.keys(dictionaries);
 
-function sampleRole(role: "STANDARD" | "MICROBIOLOGY" | "REFERENCE") {
-  if (role === "MICROBIOLOGY") return SampleRole.MICROBIOLOGY;
-  if (role === "REFERENCE") return SampleRole.REFERENCE;
-  return SampleRole.STANDARD;
-}
-
 async function main() {
   for (let i = 0; i < definitions.length; i++) {
     const [code, name, category, valueType, unit, dictionaryKey] = definitions[i];
@@ -194,43 +187,7 @@ async function main() {
     }
   }
 
-  for (const [name, plan] of Object.entries(importedStandardPlans)) {
-    const standard = await prisma.stabilityStandard.upsert({
-      where: { name },
-      update: {
-        description: "Plan próbek zaimportowany z workflow Comarch BPM. Etykiety miesięczne zachowano, a harmonogram używa stałych offsetów: 1M = 30 dni.",
-        status: StandardStatus.ACTIVE,
-        locked: false,
-      },
-      create: {
-        name,
-        description: "Plan próbek zaimportowany z workflow Comarch BPM. Etykiety miesięczne zachowano, a harmonogram używa stałych offsetów: 1M = 30 dni.",
-        status: StandardStatus.ACTIVE,
-        locked: false,
-      },
-    });
-
-    const used = await prisma.study.count({ where: { standardId: standard.id } });
-    if (used > 0) continue;
-
-    await prisma.standardSampleDefinition.deleteMany({ where: { standardId: standard.id } });
-    await prisma.standardSampleDefinition.createMany({
-      data: plan.map((definition) => ({
-        standardId: standard.id,
-        code: definition.code,
-        checkpointLabel: definition.checkpointLabel,
-        checkpointDays: definition.checkpointDays,
-        storageCondition: definition.storageCondition,
-        role: sampleRole(definition.role),
-        quantity: 1,
-        sortOrder: definition.sortOrder,
-      })),
-    });
-  }
-
-  const importedCount = Object.keys(importedStandardPlans).length;
-  const importedDefinitions = Object.values(importedStandardPlans).reduce((sum, plan) => sum + plan.length, 0);
-  console.log(`Seed extra zakończony: słowniki z workflow, 24 badania mikrobiologiczne, ${importedCount} standardów / ${importedDefinitions} definicji próbek.`);
+  console.log("Seed extra zakończony: kryteria i słowniki z workflow, 24 badania mikrobiologiczne.");
 }
 
 main().finally(() => prisma.$disconnect());
