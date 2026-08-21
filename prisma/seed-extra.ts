@@ -28,6 +28,32 @@ const definitions = [
 ] as const;
 
 const dictionaries: Record<string, string[]> = {
+  gas_type: [
+    "2.7 bar AIR",
+    "2.7 bar PIN RB",
+    "2.7 bar",
+    "4.7 bar",
+    "AZOT",
+    "CO2",
+    "DME",
+    "Izopentan (75) + Izobutan (25)",
+    "N-BUTAN",
+    "DME + 2.7 bar",
+    "2,7 bar + CO2",
+    "DME + 2,7 air",
+    "DME + 2,7 PIN RB",
+    "Brak",
+  ],
+  study_purpose: [
+    "Zamienniki surowców",
+    "Zamienniki opakowań",
+    "Nowe opakowanie",
+    "Nowa kompozycja",
+    "Nowa receptura",
+    "Nowa technologia",
+    "Pierwsza produkcja",
+    "Nowy projekt",
+  ],
   appearance: [
     "Jednorodna emulsja",
     "Lepka emulsja",
@@ -167,8 +193,6 @@ const dictionaries: Record<string, string[]> = {
   ],
 };
 
-const sourceDictionaryCategories = Object.keys(dictionaries);
-
 async function main() {
   for (let i = 0; i < definitions.length; i++) {
     const [code, name, category, valueType, unit, dictionaryKey] = definitions[i];
@@ -179,15 +203,19 @@ async function main() {
     });
   }
 
-  await prisma.dictionaryEntry.deleteMany({ where: { category: { in: sourceDictionaryCategories } } });
-
+  // Seed jest idempotentny: nie kasujemy wartości dodanych przez Administratora.
   for (const [category, values] of Object.entries(dictionaries)) {
     for (let i = 0; i < values.length; i++) {
-      await prisma.dictionaryEntry.create({ data: { category, value: values[i], active: true, sortOrder: i + 1 } });
+      const value = values[i];
+      await prisma.dictionaryEntry.upsert({
+        where: { category_value: { category, value } },
+        update: {},
+        create: { category, value, active: true, sortOrder: i + 1 },
+      });
     }
   }
 
-  console.log("Seed extra zakończony: kryteria i słowniki z workflow, 24 badania mikrobiologiczne.");
+  console.log("Seed extra: słowniki BPM gotowe, w tym 14 rodzajów gazu, 8 celów testów i 24 badania mikrobiologiczne.");
 }
 
 main().finally(() => prisma.$disconnect());
