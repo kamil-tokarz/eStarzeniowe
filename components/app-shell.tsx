@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { UserRole } from "@/generated/prisma/client";
-import { logoutAction } from "@/app/login/actions";
 
 const roleLabel: Record<UserRole, string> = {
   ADMIN: "Administrator",
@@ -35,7 +34,7 @@ export function AppShell({
           <div className="secondary-cell">Zalogowano jako</div>
           <div className="primary-cell">{user.name}</div>
           <div className="user-role">{roleLabel[user.role]}</div>
-          <form action={logoutAction}><button className="text-button" type="submit">Wyloguj</button></form>
+          <form action="/api/auth/logout" method="post"><button className="text-button" type="submit">Wyloguj</button></form>
         </div>
       </aside>
       <main className="main">{children}</main>
