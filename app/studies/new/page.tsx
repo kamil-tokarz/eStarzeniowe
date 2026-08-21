@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/app-shell";
 import { StudyForm } from "@/components/study-form";
 
-const criterionDictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology"];
+const criterionDictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind"];
 
 export default async function NewStudyPage() {
   const user = await requireUser();
@@ -23,6 +23,7 @@ export default async function NewStudyPage() {
     (dictionaryValues[entry.category] ??= []).push(entry.value);
   }
   const microbiologyValues = dictionaryValues.microbiology ?? [];
+  const componentKinds = dictionaryValues.component_kind ?? [];
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -41,6 +42,7 @@ export default async function NewStudyPage() {
         standards={standards}
         dictionaryValues={dictionaryValues}
         microbiologyValues={microbiologyValues}
+        componentKinds={componentKinds}
         defaultTechnologistId={user.role === UserRole.TECHNOLOGIST ? user.id : technologists[0]?.id ?? ""}
         today={today}
       />
