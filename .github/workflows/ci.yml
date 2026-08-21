@@ -2,9 +2,13 @@ name: eStarzeniowe CI
 
 on:
   push:
-    branches: [main, feat/bootstrap-mvp]
+    branches: [main]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: estarzeniowe-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
