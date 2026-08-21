@@ -14,9 +14,9 @@ export type CriterionCatalogItem = {
 };
 
 export const criterionCatalog: CriterionCatalogItem[] = [
-  { code: "APPEARANCE", label: "Wygląd", group: "Sensoryka", input: "expected", dictionaryKey: "appearance", defaultExpected: "Bez zmian", defaultChecked: true },
-  { code: "ODOR", label: "Zapach", group: "Sensoryka", input: "expected", dictionaryKey: "odor", defaultExpected: "Bez zmian", defaultChecked: true },
-  { code: "COLOR", label: "Barwa", group: "Sensoryka", input: "expected", dictionaryKey: "color", defaultExpected: "Bez zmian" },
+  { code: "APPEARANCE", label: "Wygląd", group: "Sensoryka", input: "expected", dictionaryKey: "appearance" },
+  { code: "ODOR", label: "Zapach", group: "Sensoryka", input: "expected", dictionaryKey: "odor" },
+  { code: "COLOR", label: "Barwa", group: "Sensoryka", input: "expected", dictionaryKey: "color" },
 
   { code: "SPRAY_TYPE", label: "Rozpył", group: "Rozpył", input: "expected", dictionaryKey: "spray" },
   { code: "SPRAY_RATE", label: "Prędkość rozpyłu", group: "Rozpył", input: "range", unit: "g/sek" },
