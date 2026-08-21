@@ -85,6 +85,13 @@ async function main() {
     });
   }
 
+  // Te kategorie pochodzą bezpośrednio z obecnego workflow i są źródłem prawdy.
+  // Usuwamy uproszczone wartości demonstracyjne z seed.ts, aby po świeżym seedzie
+  // katalog mikrobiologii miał dokładnie 24 pozycje, a rozpył dokładnie 3 warianty.
+  await prisma.dictionaryEntry.deleteMany({
+    where: { category: { in: ["spray", "crimp_width_setup", "crimp_height_setup", "microbiology"] } },
+  });
+
   for (const [category, values] of Object.entries(dictionaries)) {
     for (let i = 0; i < values.length; i++) {
       const value = values[i];
@@ -96,7 +103,7 @@ async function main() {
     }
   }
 
-  console.log("Seed extra zakończony: pełny katalog badań i 24 badania mikrobiologiczne.");
+  console.log("Seed extra zakończony: pełny katalog badań i dokładnie 24 badania mikrobiologiczne.");
 }
 
 main().finally(() => prisma.$disconnect());
