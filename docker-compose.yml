@@ -24,9 +24,13 @@ services:
       SESSION_TTL_DAYS: 14
       APP_ENV: test
       NEXT_PUBLIC_APP_NAME: eStarzeniowe
+      UPLOAD_DIR: /data/uploads
     command: sh -c "npx prisma db push && npx prisma db seed && npm start"
     ports:
       - "3000:3000"
+    volumes:
+      - estarzeniowe_uploads:/data/uploads
 
 volumes:
   estarzeniowe_pgdata:
+  estarzeniowe_uploads:
