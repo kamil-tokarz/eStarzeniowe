@@ -25,7 +25,7 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
   const [clients, technologists, standards, dictionaries] = await Promise.all([
     prisma.client.findMany({ where: { OR: [{ active: true }, { id: study.clientId }] }, orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { active: true, role: UserRole.TECHNOLOGIST }, orderBy: { name: "asc" } }),
-    prisma.stabilityStandard.findMany({ where: { status: StandardStatus.ACTIVE }, orderBy: { name: "asc" } }),
+    prisma.stabilityStandard.findMany({ where: { OR: [{ status: StandardStatus.ACTIVE }, { id: study.standardId ?? "" }] }, orderBy: { name: "asc" } }),
     prisma.dictionaryEntry.findMany({ where: { category: { in: dictionaryCategories }, active: true }, orderBy: [{ category: "asc" }, { sortOrder: "asc" }] }),
   ]);
 
@@ -41,11 +41,9 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
   const substances = study.criteria.filter((item) => item.testDefinition.code.startsWith("SUBSTANCE_") || item.testDefinition.category === "Zawartość substancji");
   const substanceRows = [...substances, ...Array(Math.max(0, 5 - substances.length)).fill(null)].slice(0, 5);
 
-  const errorText = query.error === "criteria" ? "Wybierz co najmniej jedno kryterium akceptacji." : query.error ? "Nie udało się zapisać zmian. Sprawdź wymagane pola i wartości kryteriów." : null;
-
   return <AppShell user={user} active="studies">
     <div className="topline"><div><div className="eyebrow">{study.studyNumber} · wersja robocza</div><h1>Edytuj zlecenie</h1><div className="subtle">Do przekazania do Laboratorium możesz swobodnie zmieniać cały zakres badania.</div></div><Link href={`/studies/${id}`} className="btn btn-secondary">← Wróć do zlecenia</Link></div>
-    {errorText && <div className="form-error" style={{marginTop: 22}}>{errorText}</div>}
+    {query.error && <div className="form-error" style={{marginTop: 22}}>{query.error}</div>}
     <form method="post" action={`/api/studies/${id}/draft`} className="study-form">
       <section className="form-section"><div className="form-section-head"><span className="step-number">01</span><div><h2>Projekt i odpowiedzialność</h2><p>Numer badania pozostaje bez zmian.</p></div></div><div className="form-grid form-grid-2">
         <label className="field field-wide">Nazwa projektu *<input name="projectName" defaultValue={study.projectName} required/></label>
@@ -61,10 +59,10 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
         <label className="field">Data rozpoczęcia testów *<input name="startDate" type="date" defaultValue={inputDate(study.startDate)} required/></label>
         <label className="field">Pojemność [ml]<input name="volumeMl" type="number" step="0.01" min="0" defaultValue={study.volumeMl ?? ""}/></label>
         <label className="field">Waga nastawu [g]<input name="fillWeightG" type="number" step="0.01" min="0" defaultValue={study.fillWeightG ?? ""}/></label>
-        <label className="field">Waga wsadu [g]<input name="totalWeightG" type="number" step="0.01" min="0" defaultValue={study.totalWeightG ?? ""}/></label>
+        <label className="field">Waga wsadu [g]<input type="number" step="0.01" readOnly value={study.totalWeightG ?? ""} placeholder="nastaw + gaz; przeliczana przy zapisie"/></label>
         <label className="checkbox-card"><input name="aerosol" type="checkbox" defaultChecked={study.aerosol}/><span><strong>Aerozol</strong><small>Po odznaczeniu dane gazu zostaną wyczyszczone.</small></span></label>
         <label className="field">Rodzaj gazu<input name="gasType" defaultValue={study.gasType ?? ""}/></label><label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" defaultValue={study.gasWeightG ?? ""}/></label>
-      </div></section>
+      </div><div className="subtle" style={{marginTop: 10}}>Waga wsadu jest wyliczana automatycznie jako waga nastawu + waga gazu. Dla produktu nieaerozolowego jest równa wadze nastawu.</div></section>
 
       <section className="form-section"><div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Możesz zmienić listę do chwili przekazania.</p></div></div><div className="component-table"><div className="component-row component-head"><span>Rodzaj</span><span>Kod</span><span>Nazwa</span><span>Dostawca</span></div>{components.map((item,index)=>{
         const kinds = item?.kind && !componentKinds.includes(item.kind) ? [item.kind, ...componentKinds] : componentKinds;
@@ -94,7 +92,7 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
 
       <section className="form-section"><div className="form-section-head"><span className="step-number">05</span><div><h2>Mikrobiologia</h2><p>Zakres informacyjny dla badania zewnętrznego; w systemie wróci jedna zbiorcza ocena OK/NOK.</p></div></div><details className="micro-scope" open={selectedMicro.size > 0}><summary>Wybierz badania mikrobiologiczne <span>{dictionaryValues.microbiology?.length ?? 0} pozycji</span></summary><div className="micro-grid">{(dictionaryValues.microbiology ?? []).map((value)=><label className="micro-option" key={value}><input type="checkbox" name="microTests" value={value} defaultChecked={selectedMicro.has(value)}/><span>{value}</span></label>)}</div></details></section>
 
-      <section className="form-section"><div className="form-section-head"><span className="step-number">06</span><div><h2>Standard stabilności</h2><p>Po przekazaniu standard i plan fizycznych próbek zostaną zamrożone.</p></div></div><label className="field field-wide">Standard *<select name="standardId" required defaultValue={study.standardId ?? ""}>{standards.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label></section>
+      <section className="form-section"><div className="form-section-head"><span className="step-number">06</span><div><h2>Standard stabilności</h2><p>Po przekazaniu standard i plan fizycznych próbek zostaną zamrożone.</p></div></div><label className="field field-wide">Standard *<select name="standardId" required defaultValue={study.standardId ?? ""}>{standards.map((item)=><option key={item.id} value={item.id}>{item.name}{item.status !== StandardStatus.ACTIVE ? " (nieaktywny)" : ""}</option>)}</select></label></section>
       <div className="sticky-form-actions"><div><strong>Zapisz wersję roboczą</strong><span>Zmiany nie generują jeszcze próbek ani zadań Laboratorium.</span></div><button className="btn btn-primary btn-large" type="submit">Zapisz zmiany</button></div>
     </form>
   </AppShell>;
