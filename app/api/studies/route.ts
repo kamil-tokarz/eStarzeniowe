@@ -24,6 +24,12 @@ function numberOrNull(formData: FormData, key: string) {
   return value;
 }
 
+function rowCount(formData: FormData, key: string) {
+  const parsed = Number(text(formData, key));
+  if (!Number.isInteger(parsed) || parsed < 1) return 1;
+  return Math.min(parsed, 100);
+}
+
 function dateValue(formData: FormData, key: string) {
   const raw = required(formData, key);
   const value = new Date(`${raw}T12:00:00`);
@@ -57,14 +63,16 @@ export async function POST(request: NextRequest) {
     const productionDate = dateValue(formData, "productionDate");
     const startDate = dateValue(formData, "startDate");
     const aerosol = formData.get("aerosol") === "on";
+    const gasType = aerosol ? required(formData, "gasType") : null;
     const gasWeightG = aerosol ? numberOrNull(formData, "gasWeightG") : null;
     const fillWeightG = numberOrNull(formData, "fillWeightG");
     const volumeMl = numberOrNull(formData, "volumeMl");
     const totalWeightG = fillWeightG != null && (!aerosol || gasWeightG != null) ? fillWeightG + (gasWeightG ?? 0) : null;
+    const purpose = text(formData, "purpose") || null;
     const selectedCodes = criterionCatalog.filter((item) => formData.get(`criterion_${item.code}`) === "on").map((item) => item.code);
     const microbiologyScope = [...new Set(formData.getAll("microTests").map((item) => String(item).trim()).filter(Boolean))];
 
-    const components = Array.from({ length: 5 }, (_, index) => index + 1).map((index) => ({
+    const components = Array.from({ length: rowCount(formData, "componentCount") }, (_, index) => index + 1).map((index) => ({
       kind: text(formData, `componentKind_${index}`),
       code: text(formData, `componentCode_${index}`),
       name: text(formData, `componentName_${index}`),
@@ -74,16 +82,24 @@ export async function POST(request: NextRequest) {
       if (!row.kind || !row.name) throw new Error("Każdy uzupełniony komponent musi mieć rodzaj i nazwę.");
     }
 
-    const substances = Array.from({ length: 5 }, (_, index) => index + 1).map((index) => ({
+    const substances = Array.from({ length: rowCount(formData, "substanceCount") }, (_, index) => index + 1).map((index) => ({
       name: text(formData, `substanceName_${index}`),
+      present: text(formData, `substancePresent_${index}`) !== "no",
       min: numberOrNull(formData, `substanceMin_${index}`),
       max: numberOrNull(formData, `substanceMax_${index}`),
+      sortOrder: index,
     })).filter((row) => row.name || row.min != null || row.max != null);
 
-    if (selectedCodes.length === 0 && substances.length === 0) throw new Error("Wybierz co najmniej jedno kryterium akceptacji.");
+    const seenSubstances = new Set<string>();
     for (const row of substances) {
-      if (!row.name || row.min == null || row.max == null || row.min > row.max) throw new Error(`Podaj nazwę i poprawny zakres dla każdej substancji.`);
+      if (!row.name) throw new Error("Podaj nazwę każdej uzupełnionej substancji.");
+      const normalized = row.name.toLocaleLowerCase("pl-PL");
+      if (seenSubstances.has(normalized)) throw new Error(`Substancja „${row.name}” została dodana więcej niż raz.`);
+      seenSubstances.add(normalized);
+      if (row.present && (row.min == null || row.max == null || row.min > row.max)) throw new Error(`Podaj poprawny zakres dla substancji: ${row.name}.`);
     }
+
+    if (selectedCodes.length === 0 && !substances.some((row) => row.present)) throw new Error("Wybierz co najmniej jedno kryterium akceptacji.");
 
     const year = new Date().getFullYear();
     const study = await prisma.$transaction(async (tx) => {
@@ -92,7 +108,7 @@ export async function POST(request: NextRequest) {
         tx.client.findUnique({ where: { id: clientId } }),
         tx.user.findUnique({ where: { id: responsibleTechnologistId } }),
         tx.dictionaryEntry.findMany({
-          where: { active: true, category: { in: ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind"] } },
+          where: { active: true, category: { in: ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind", "gas_type", "study_purpose"] } },
           select: { category: true, value: true },
         }),
       ]);
@@ -113,6 +129,8 @@ export async function POST(request: NextRequest) {
       for (const component of components) {
         if (!dictionaryMap.get("component_kind")?.has(component.kind)) throw new Error(`Nieaktywny rodzaj komponentu: ${component.kind}`);
       }
+      if (gasType && !dictionaryMap.get("gas_type")?.has(gasType)) throw new Error("Wybierz aktywny rodzaj gazu ze słownika.");
+      if (purpose && !dictionaryMap.get("study_purpose")?.has(purpose)) throw new Error("Wybierz aktywny cel testów ze słownika.");
 
       await tx.$queryRawUnsafe<Array<{ locked: number }>>("SELECT 1 AS locked FROM pg_advisory_xact_lock($1)", year);
       const prefix = `ES-${year}-`;
@@ -131,13 +149,13 @@ export async function POST(request: NextRequest) {
           responsibleTechnologistId,
           createdById: user.id,
           aerosol,
-          gasType: aerosol ? text(formData, "gasType") || null : null,
+          gasType,
           gasWeightG,
           fillWeightG,
           totalWeightG,
           volumeMl,
           internalTest: text(formData, "testType") !== "customer",
-          purpose: text(formData, "purpose") || null,
+          purpose,
           status: StudyStatus.DRAFT,
           standardId,
         },
@@ -148,6 +166,9 @@ export async function POST(request: NextRequest) {
       }
       if (microbiologyScope.length) {
         await tx.studyComponent.createMany({ data: microbiologyScope.map((name, index) => ({ studyId: created.id, kind: "Badanie mikrobiologiczne", code: `MICRO-${String(index + 1).padStart(2, "0")}`, name })) });
+      }
+      if (substances.length) {
+        await tx.studySubstance.createMany({ data: substances.map((row) => ({ studyId: created.id, name: row.name, present: row.present, minValue: row.present ? row.min : null, maxValue: row.present ? row.max : null, sortOrder: row.sortOrder })) });
       }
 
       const definitions = await tx.testDefinition.findMany({ where: { active: true, code: { in: selectedCodes } } });
@@ -194,7 +215,7 @@ export async function POST(request: NextRequest) {
         await tx.studyCriterion.update({ where: { id: criterion.id }, data: { currentVersionId: version.id } });
       }
 
-      for (const row of substances) {
+      for (const row of substances.filter((item) => item.present)) {
         const code = substanceCode(row.name);
         const definition = await tx.testDefinition.upsert({
           where: { code },
