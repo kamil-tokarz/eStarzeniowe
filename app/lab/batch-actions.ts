@@ -28,7 +28,7 @@ function initialComplete(aerosol: boolean, measurement: { initialWeightG: number
   return weight && pressure;
 }
 
-function evaluate(criterion: { kind: CriterionKind; currentVersion: { minValue: number | null; maxValue: number | null; expectedText: string | null; expectedBoolean: boolean | null } | null } | null, value: { numeric: number | null; text: string | null; boolean: boolean | null }) {
+function evaluate(criterion: { kind: CriterionKind; currentVersion: { minValue: number | null; maxValue: number | null; expectedText: string | null; expectedBoolean: boolean | null } | null } | null, value: { numeric: number | null; text: string | null; boolean: boolean | null }): Evaluation {
   const v = criterion?.currentVersion;
   if (!criterion || !v) return Evaluation.NOT_APPLICABLE;
   if (criterion.kind === CriterionKind.RANGE && value.numeric != null) return (v.minValue == null || value.numeric >= v.minValue) && (v.maxValue == null || value.numeric <= v.maxValue) ? Evaluation.OK : Evaluation.NOK;
@@ -106,7 +106,7 @@ export async function saveBatchResultsAction(formData: FormData) {
     let numeric: number | null = null;
     let text: string | null = null;
     let bool: boolean | null = null;
-    let evaluation = Evaluation.NOT_APPLICABLE;
+    let evaluation: Evaluation = Evaluation.NOT_APPLICABLE;
 
     if (state === ResultState.NOT_PERFORMED) {
       if (!reasonRaw) { errors++; continue; }
