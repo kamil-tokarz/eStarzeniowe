@@ -75,7 +75,7 @@ function evaluateResult(
     } | null;
   } | null,
   value: { numeric: number | null; text: string | null; boolean: boolean | null },
-) {
+): Evaluation {
   if (!criterion?.currentVersion) return Evaluation.NOT_APPLICABLE;
   const v = criterion.currentVersion;
   switch (criterion.kind) {
@@ -211,7 +211,7 @@ export async function saveSampleResultsAction(formData: FormData) {
     let numeric: number | null = null;
     let text: string | null = null;
     let bool: boolean | null = null;
-    let evaluation = Evaluation.NOT_APPLICABLE;
+    let evaluation: Evaluation = Evaluation.NOT_APPLICABLE;
 
     if (state === ResultState.NOT_PERFORMED) {
       if (!reasonRaw) throw new Error(`Podaj powód „Nie wykonano” dla: ${test.testDefinition.name}.`);
@@ -297,7 +297,7 @@ export async function saveMicrobiologyResultAction(formData: FormData) {
   const user = await requireLaboratoryUser();
   const sampleId = requiredString(formData, "sampleId");
   const evaluationRaw = requiredString(formData, "evaluation");
-  const evaluation = evaluationRaw === Evaluation.NOK ? Evaluation.NOK : Evaluation.OK;
+  const evaluation: Evaluation = evaluationRaw === Evaluation.NOK ? Evaluation.NOK : Evaluation.OK;
   const sample = await prisma.sample.findUnique({ where: { id: sampleId }, include: { study: true } });
   if (!sample || sample.role !== SampleRole.MICROBIOLOGY || sample.study.status !== StudyStatus.ACTIVE) throw new Error("To nie jest aktywna próbka mikrobiologiczna.");
   if (!(await allStudyInitialsComplete(sample.studyId))) throw new Error("Najpierw zakończ badania wstępne wszystkich próbek w tym badaniu.");
