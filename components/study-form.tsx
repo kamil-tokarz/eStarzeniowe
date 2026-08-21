@@ -25,6 +25,11 @@ export function StudyForm({
   today: string;
 }) {
   const [aerosol, setAerosol] = useState(true);
+  const [fillWeight, setFillWeight] = useState("");
+  const [gasWeight, setGasWeight] = useState("");
+  const fill = fillWeight === "" ? null : Number(fillWeight);
+  const gas = gasWeight === "" ? null : Number(gasWeight);
+  const totalWeight = fill != null && Number.isFinite(fill) && (!aerosol || (gas != null && Number.isFinite(gas))) ? fill + (aerosol ? gas ?? 0 : 0) : null;
 
   return (
     <form method="post" action="/api/studies" className="study-form">
@@ -46,11 +51,11 @@ export function StudyForm({
           <label className="field">Data produkcji próbek *<input name="productionDate" type="date" defaultValue={today} required /></label>
           <label className="field">Data rozpoczęcia testów *<input name="startDate" type="date" min={today} defaultValue={today} required /></label>
           <label className="field">Pojemność [ml]<input name="volumeMl" type="number" step="0.01" min="0" /></label>
-          <label className="field">Waga nastawu [g]<input name="fillWeightG" type="number" step="0.01" min="0" /></label>
-          <label className="field">Waga wsadu [g]<input name="totalWeightG" type="number" step="0.01" min="0" /></label>
-          <label className="checkbox-card"><input name="aerosol" type="checkbox" checked={aerosol} onChange={(event) => setAerosol(event.target.checked)} /><span><strong>Aerozol</strong><small>Wymaga pomiaru ciśnienia początkowego i bieżącego.</small></span></label>
+          <label className="field">Waga nastawu [g]<input name="fillWeightG" type="number" step="0.01" min="0" value={fillWeight} onChange={(event) => setFillWeight(event.target.value)} /></label>
+          <label className="field">Waga wsadu [g]<input type="number" step="0.01" readOnly value={totalWeight ?? ""} placeholder="nastaw + gaz" /></label>
+          <label className="checkbox-card"><input name="aerosol" type="checkbox" checked={aerosol} onChange={(event) => { setAerosol(event.target.checked); if (!event.target.checked) setGasWeight(""); }} /><span><strong>Aerozol</strong><small>Wymaga pomiaru ciśnienia początkowego i bieżącego.</small></span></label>
         </div>
-        {aerosol && <div className="form-grid form-grid-3 aerosol-fields"><label className="field">Rodzaj gazu<input name="gasType" placeholder="np. LPG / N₂" /></label><label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" /></label></div>}
+        {aerosol && <div className="form-grid form-grid-3 aerosol-fields"><label className="field">Rodzaj gazu<input name="gasType" placeholder="np. LPG / N₂" /></label><label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" value={gasWeight} onChange={(event) => setGasWeight(event.target.value)} /></label></div>}
       </section>
 
       <section className="form-section">
@@ -76,7 +81,6 @@ export function StudyForm({
                         <input name={`criterion_${item.code}`} type="checkbox" defaultChecked={item.defaultChecked} />
                         <span><strong>{item.label}</strong><small>{item.unit ? `${item.input === "minimum" ? "minimum" : "zakres"} · ${item.unit}` : item.input === "boolean" ? "wykonanie / zgodność" : item.input === "expected" ? "wartość oczekiwana" : "kryterium"}</small></span>
                       </label>
-
                       {item.input === "range" && <div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" defaultValue={item.defaultMin ?? ""} placeholder="min" aria-label={`${item.label} minimum`} /><span>–</span><input name={`${item.code}_max`} type="number" step="any" defaultValue={item.defaultMax ?? ""} placeholder="max" aria-label={`${item.label} maksimum`} /></div>}
                       {item.input === "minimum" && <input name={`${item.code}_min`} type="number" step="any" placeholder={`Minimum${item.unit ? ` [${item.unit}]` : ""}`} aria-label={`${item.label} minimum`} />}
                       {item.input === "expected" && <select name={`${item.code}_expected`} defaultValue=""><option value="" disabled>Wybierz wartość</option>{dictionary.map((value) => <option key={value} value={value}>{value}</option>)}</select>}
@@ -104,18 +108,16 @@ export function StudyForm({
         <div className="form-section-head"><span className="step-number">05</span><div><h2>Mikrobiologia</h2><p>Opcjonalny zakres przekazywany do laboratorium zewnętrznego. W systemie wróci jedna zbiorcza ocena OK/NOK i opcjonalny raport.</p></div></div>
         <details className="micro-scope">
           <summary>Wybierz badania mikrobiologiczne <span>{microbiologyValues.length} pozycji w katalogu</span></summary>
-          <div className="micro-grid">
-            {microbiologyValues.map((value) => <label className="micro-option" key={value}><input type="checkbox" name="microTests" value={value} /><span>{value}</span></label>)}
-          </div>
+          <div className="micro-grid">{microbiologyValues.map((value) => <label className="micro-option" key={value}><input type="checkbox" name="microTests" value={value} /><span>{value}</span></label>)}</div>
         </details>
       </section>
 
       <section className="form-section">
         <div className="form-section-head"><span className="step-number">06</span><div><h2>Standard stabilności</h2><p>Standard definiuje wyłącznie fizyczny plan próbek, warunki przechowywania i stałe offsety dni.</p></div></div>
-        <label className="field field-wide">Standard *<select name="standardId" required defaultValue={standards[0]?.id ?? ""}>{standards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="field field-wide">Standard *<select name="standardId" required defaultValue={standards[0]?.id ?? ""}><option value="" disabled>{standards.length ? "Wybierz standard" : "Brak aktywnych standardów"}</option>{standards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       </section>
 
-      <div className="sticky-form-actions"><div><strong>Zapis jako wersja robocza</strong><span>Numer badania zostanie nadany automatycznie.</span></div><button className="btn btn-primary btn-large" type="submit">Utwórz zlecenie</button></div>
+      <div className="sticky-form-actions"><div><strong>Zapis jako wersja robocza</strong><span>Numer badania zostanie nadany automatycznie.</span></div><button className="btn btn-primary btn-large" type="submit" disabled={!standards.length}>Utwórz zlecenie</button></div>
     </form>
   );
 }
