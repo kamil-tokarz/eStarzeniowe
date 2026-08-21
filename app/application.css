@@ -1,0 +1,10 @@
+.standalone-page { max-width: 1540px; margin: 0 auto; padding: 40px 44px 70px; min-height: 100vh; }
+.activity-list { background: #fff; border: 1px solid var(--jp-line); border-radius: var(--radius-md); overflow: hidden; }
+.activity-row { display: grid; grid-template-columns: 170px 1fr 180px; gap: 16px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f0f2f4; }
+.activity-row:last-child { border-bottom: 0; }
+.activity-row span, .activity-row small { color: var(--jp-muted); font-size: 12px; }
+.activity-row strong { font-size: 13px; }
+@media (max-width: 760px) {
+  .standalone-page { padding: 28px 20px 50px; }
+  .activity-row { grid-template-columns: 1fr; gap: 4px; }
+}
