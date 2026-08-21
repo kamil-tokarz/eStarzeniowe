@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Evaluation, SampleRole, StudyStatus, UserRole } from "@/generated/prisma/client";
+import { CriterionKind, Evaluation, SampleRole, StudyStatus, UserRole } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/app-shell";
 import { cancelStudyAction, handoverStudyAction } from "@/app/studies/actions";
+import { activateReferenceAction, changeCriterionAction, interruptStudyAction } from "@/app/studies/attention-actions";
 
 const statusLabel: Record<StudyStatus, string> = {
   DRAFT: "Robocze",
@@ -24,12 +25,12 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
       responsibleTechnologist: true,
       standard: { include: { definitions: { orderBy: { sortOrder: "asc" } } } },
       components: true,
-      criteria: { include: { testDefinition: true, currentVersion: true, versions: { orderBy: { version: "desc" }, take: 1 } } },
+      criteria: { include: { testDefinition: true, currentVersion: true, versions: { orderBy: { version: "desc" }, take: 3, include: { author: true } } } },
       samples: {
         orderBy: [{ nominalDate: "asc" }, { code: "asc" }],
         include: { initialMeasurement: true, tests: { include: { testDefinition: true, result: true } }, microbiologyResult: true },
       },
-      auditEvents: { orderBy: { createdAt: "desc" }, take: 12, include: { author: true } },
+      auditEvents: { orderBy: { createdAt: "desc" }, take: 16, include: { author: true } },
     },
   });
   if (!study) notFound();
@@ -77,6 +78,8 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
         <section className="info-callout warning-callout"><div><strong>Najpierw badania wstępne</strong><span>Laboratorium musi zapisać wagę początkową wszystkich próbek oraz ciśnienie dla aerozoli. Dopiero potem otworzą się badania właściwe.</span></div><Link className="btn btn-secondary" href="/lab">Otwórz Laboratorium</Link></section>
       )}
 
+      {study.status === StudyStatus.INTERRUPTED && <section className="info-callout warning-callout"><div><strong>Badanie zostało przerwane</strong><span>{study.interruptionReason || "Brak opisu powodu."} Wszystkie dane pozostają tylko do odczytu.</span></div></section>}
+
       <section className="kpi-grid">
         <div className="kpi teal"><div className="kpi-value">{study.samples.length ? `${completed}/${executable.length}` : "—"}</div><div className="kpi-label">Próbki wykonane</div><div className="kpi-note">bez niewykorzystanych RF</div></div>
         <div className="kpi danger"><div className="kpi-value">{nokResults.length}</div><div className="kpi-label">Aktualne NOK</div><div className="kpi-note">według bieżących kryteriów</div></div>
@@ -99,12 +102,16 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
 
       {nokResults.length > 0 && <section className="section" id="results">
         <div className="section-head"><div><div className="eyebrow">Wymaga uwagi</div><div className="section-title">Wyniki NOK</div></div></div>
-        <div className="table-card"><table><thead><tr><th>Próbka</th><th>Badanie</th><th>Wynik</th><th>Warunek</th><th>Zapisano</th></tr></thead><tbody>
-          {nokResults.map(({ sample, test, result }) => <tr key={result.id}>
-            <td className="primary-cell">{sample.code}</td><td>{test.testDefinition.name}</td>
-            <td><span className="badge danger"><span className="dot" />{result.numericValue ?? result.textValue ?? String(result.booleanValue)}</span></td>
-            <td>{sample.storageCondition}</td><td>{result.updatedAt.toLocaleString("pl-PL")}</td>
-          </tr>)}
+        <div className="table-card"><table><thead><tr><th>Próbka</th><th>Badanie</th><th>Wynik</th><th>Warunek</th><th>Zapisano</th><th>RF / OOS</th></tr></thead><tbody>
+          {nokResults.map(({ sample, test, result }) => {
+            const availableRef = references.some((ref) => ref.referenceStatus === "AVAILABLE" && ref.storageCondition === sample.storageCondition);
+            return <tr key={result.id}>
+              <td className="primary-cell">{sample.code}</td><td>{test.testDefinition.name}</td>
+              <td><span className="badge danger"><span className="dot" />{result.numericValue ?? result.textValue ?? String(result.booleanValue)}</span></td>
+              <td>{sample.storageCondition}</td><td>{result.updatedAt.toLocaleString("pl-PL")}</td>
+              <td>{study.status === StudyStatus.ACTIVE && canManage && availableRef ? <form action={activateReferenceAction} className="rf-action"><input type="hidden" name="sourceResultId" value={result.id} /><input name="reason" placeholder="Powód użycia RF" defaultValue="Weryfikacja wyniku NOK" required /><button className="btn btn-small btn-secondary" type="submit">Użyj RF</button></form> : <span className="subtle">{availableRef ? "—" : "Brak RF dla warunku"}</span>}</td>
+            </tr>;
+          })}
         </tbody></table></div>
       </section>}
 
@@ -118,7 +125,7 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
             const initialOk = initial ? (initial.initialWeightG != null || initial.weightNotPerformed) && (!study.aerosol || initial.initialPressureBar != null || initial.pressureNotPerformed) : false;
             return <tr key={sample.id}>
               <td className="primary-cell">{sample.code}</td>
-              <td>{role === "REFERENCE" ? <span className="badge warning">RF / OOS backup</span> : role === "MICROBIOLOGY" ? "Mikrobiologia" : "Standardowa"}</td>
+              <td>{role === "REFERENCE" ? <span className={`badge ${isGenerated && sample.referenceStatus === "ACTIVATED" ? "teal" : "warning"}`}>{isGenerated && sample.referenceStatus === "ACTIVATED" ? "RF aktywowana" : "RF / OOS backup"}</span> : role === "MICROBIOLOGY" ? "Mikrobiologia" : "Standardowa"}</td>
               <td>{sample.checkpointLabel ?? "—"}</td><td>{isGenerated ? sample.nominalDate?.toLocaleDateString("pl-PL") ?? "—" : sample.checkpointDays == null ? "—" : `+${sample.checkpointDays} dni`}</td>
               <td>{sample.storageCondition}</td><td>{isGenerated ? <span className={`badge ${initialOk ? "success" : "warning"}`}>{initialOk ? "Gotowe" : "Do wykonania"}</span> : "po przekazaniu"}</td>
               <td>{isGenerated ? <Link className="section-link" href={`/lab/sample/${sample.id}`}>{role === "REFERENCE" ? sample.referenceStatus : sample.executionStatus}</Link> : "—"}</td>
@@ -128,14 +135,30 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
       </section>
 
       <section className="section" id="criteria">
-        <div className="section-head"><div><div className="eyebrow">Specyfikacja</div><div className="section-title">Kryteria akceptacji</div></div></div>
-        <div className="table-card"><table><thead><tr><th>Badanie</th><th>Typ</th><th>Aktualne kryterium</th><th>Wersja</th></tr></thead><tbody>
+        <div className="section-head"><div><div className="eyebrow">Specyfikacja</div><div className="section-title">Kryteria akceptacji</div><div className="subtle">Zakres badań jest zamrożony. W aktywnym badaniu Technolog może zmienić wyłącznie wartość istniejącego kryterium.</div></div></div>
+        <div className="table-card"><table><thead><tr><th>Badanie</th><th>Typ</th><th>Aktualne kryterium</th><th>Wersja</th><th>Ostatnia zmiana</th></tr></thead><tbody>
           {study.criteria.map((criterion) => {
             const v = criterion.currentVersion;
             const value = !v ? "—" : v.minValue != null || v.maxValue != null ? `${v.minValue ?? "−∞"} – ${v.maxValue ?? "+∞"}` : v.expectedText ?? (v.expectedBoolean == null ? "—" : v.expectedBoolean ? "TAK" : "NIE");
-            return <tr key={criterion.id}><td className="primary-cell">{criterion.testDefinition.name}</td><td>{criterion.kind}</td><td>{value}</td><td>v{v?.version ?? 1}</td></tr>;
+            return <tr key={criterion.id}><td className="primary-cell">{criterion.testDefinition.name}</td><td>{criterion.kind}</td><td>{value}</td><td>v{v?.version ?? 1}</td><td>{v?.reason || "Kryterium początkowe"}</td></tr>;
           })}
         </tbody></table></div>
+        {study.status === StudyStatus.ACTIVE && canManage && <div className="criterion-edit-list">
+          {study.criteria.map((criterion) => {
+            const v = criterion.currentVersion;
+            if (!v) return null;
+            return <details className="criterion-editor" key={criterion.id}>
+              <summary><span><strong>{criterion.testDefinition.name}</strong><small>Aktualnie v{v.version}</small></span><span>Zmień wartość kryterium</span></summary>
+              <form action={changeCriterionAction}>
+                <input type="hidden" name="criterionId" value={criterion.id} />
+                {[CriterionKind.RANGE, CriterionKind.MINIMUM, CriterionKind.MAXIMUM].includes(criterion.kind) ? <div className="criterion-editor-values"><label>Minimum<input name="minValue" type="number" step="any" defaultValue={v.minValue ?? ""} /></label><label>Maksimum<input name="maxValue" type="number" step="any" defaultValue={v.maxValue ?? ""} /></label></div> : criterion.kind === CriterionKind.EXPECTED_VALUE ? <label>Wartość oczekiwana<input name="expectedText" defaultValue={v.expectedText ?? ""} required /></label> : criterion.kind === CriterionKind.BOOLEAN_EXPECTED ? <label>Wartość oczekiwana<select name="expectedBoolean" defaultValue={v.expectedBoolean ? "true" : "false"}><option value="true">TAK</option><option value="false">NIE</option></select></label> : null}
+                <label className="criterion-reason">Uzasadnienie zmiany *<input name="reason" placeholder="Dlaczego kryterium się zmienia?" required /></label>
+                <button className="btn btn-primary" type="submit">Zapisz nową wersję</button>
+              </form>
+              {criterion.versions.length > 1 && <div className="criterion-history">{criterion.versions.map((version) => <div key={version.id}><strong>v{version.version}</strong><span>{version.createdAt.toLocaleString("pl-PL")} · {version.author.name}</span><small>{version.reason || "Kryterium początkowe"}</small></div>)}</div>}
+            </details>;
+          })}
+        </div>}
       </section>
 
       <section className="section" id="history">
@@ -146,6 +169,7 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
       </section>
 
       {study.status === StudyStatus.DRAFT && canManage && <section className="danger-zone"><div><strong>Anuluj zlecenie</strong><span>Anulowanie jest nieodwracalne i wymaga podania powodu.</span></div><form action={cancelStudyAction} className="inline-form"><input type="hidden" name="studyId" value={study.id} /><input name="reason" placeholder="Powód anulowania" required /><button className="btn btn-danger" type="submit">Anuluj</button></form></section>}
+      {study.status === StudyStatus.ACTIVE && canManage && <section className="danger-zone"><div><strong>Przerwij badanie</strong><span>Przerwanie jest nieodwracalne. Zlecenie i wyniki pozostaną w historii, ale znikną z kolejki Laboratorium.</span></div><form action={interruptStudyAction} className="inline-form"><input type="hidden" name="studyId" value={study.id} /><input name="reason" placeholder="Powód przerwania" required /><button className="btn btn-danger" type="submit">Przerwij</button></form></section>}
     </AppShell>
   );
 }
