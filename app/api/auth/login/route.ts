@@ -10,18 +10,24 @@ function tokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function externalUrl(request: NextRequest, path: string) {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? request.nextUrl.host;
+  const proto = request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "") ?? "http";
+  return new URL(path, `${proto}://${host}`);
+}
+
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const login = String(formData.get("login") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
   if (!login || !password) {
-    return NextResponse.redirect(new URL("/login?error=missing", request.url), 303);
+    return NextResponse.redirect(externalUrl(request, "/login?error=missing"), 303);
   }
 
   const user = await prisma.user.findUnique({ where: { login } });
   if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
-    return NextResponse.redirect(new URL("/login?error=invalid", request.url), 303);
+    return NextResponse.redirect(externalUrl(request, "/login?error=invalid"), 303);
   }
 
   const token = randomBytes(32).toString("base64url");
@@ -30,11 +36,12 @@ export async function POST(request: NextRequest) {
     data: { userId: user.id, tokenHash: tokenHash(token), expiresAt },
   });
 
-  const response = NextResponse.redirect(new URL("/", request.url), 303);
+  const proto = request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "");
+  const response = NextResponse.redirect(externalUrl(request, "/"), 303);
   response.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: request.nextUrl.protocol === "https:" || process.env.APP_ENV === "production",
+    secure: proto === "https" || process.env.APP_ENV === "production",
     path: "/",
     expires: expiresAt,
   });
