@@ -11,6 +11,7 @@ export function StudyForm({
   standards,
   dictionaryValues,
   microbiologyValues,
+  componentKinds,
   defaultTechnologistId,
   today,
 }: {
@@ -19,6 +20,7 @@ export function StudyForm({
   standards: Option[];
   dictionaryValues: Record<string, string[]>;
   microbiologyValues: string[];
+  componentKinds: string[];
   defaultTechnologistId: string;
   today: string;
 }) {
@@ -55,7 +57,7 @@ export function StudyForm({
         <div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Elementy produktu i opakowania. Puste wiersze zostaną pominięte.</p></div></div>
         <div className="component-table">
           <div className="component-row component-head"><span>Rodzaj</span><span>Kod</span><span>Nazwa</span><span>Dostawca</span></div>
-          {[1, 2, 3, 4, 5].map((index) => <div className="component-row" key={index}><input name={`componentKind_${index}`} placeholder="np. Pojemnik" /><input name={`componentCode_${index}`} placeholder="Kod" /><input name={`componentName_${index}`} placeholder="Nazwa komponentu" /><input name={`componentSupplier_${index}`} placeholder="Dostawca" /></div>)}
+          {[1, 2, 3, 4, 5].map((index) => <div className="component-row" key={index}><select name={`componentKind_${index}`} defaultValue=""><option value="">Wybierz rodzaj</option>{componentKinds.map((value) => <option key={value} value={value}>{value}</option>)}</select><input name={`componentCode_${index}`} placeholder="Kod" /><input name={`componentName_${index}`} placeholder="Nazwa komponentu" /><input name={`componentSupplier_${index}`} placeholder="Dostawca" /></div>)}
         </div>
       </section>
 
@@ -77,9 +79,9 @@ export function StudyForm({
 
                       {item.input === "range" && <div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" defaultValue={item.defaultMin ?? ""} placeholder="min" aria-label={`${item.label} minimum`} /><span>–</span><input name={`${item.code}_max`} type="number" step="any" defaultValue={item.defaultMax ?? ""} placeholder="max" aria-label={`${item.label} maksimum`} /></div>}
                       {item.input === "minimum" && <input name={`${item.code}_min`} type="number" step="any" placeholder={`Minimum${item.unit ? ` [${item.unit}]` : ""}`} aria-label={`${item.label} minimum`} />}
-                      {item.input === "expected" && <select name={`${item.code}_expected`} defaultValue={item.defaultExpected ?? dictionary[0] ?? ""}><option value="" disabled>Wybierz wartość</option>{dictionary.map((value) => <option key={value} value={value}>{value}</option>)}</select>}
+                      {item.input === "expected" && <select name={`${item.code}_expected`} defaultValue=""><option value="" disabled>Wybierz wartość</option>{dictionary.map((value) => <option key={value} value={value}>{value}</option>)}</select>}
                       {item.input === "boolean" && <div className="criterion-info">Po wybraniu Laboratorium otrzyma obowiązkowe pole TAK/NIE; oczekiwana wartość: TAK.</div>}
-                      {item.input === "crimp" && <div className="crimp-config"><select name={`${item.code}_preset`} defaultValue={dictionary[0] ?? ""}><option value="" disabled>Wybierz konfigurację materiałową</option>{dictionary.map((value) => <option key={value} value={value}>{value}</option>)}</select><div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" placeholder="min dla INNE" /><span>–</span><input name={`${item.code}_max`} type="number" step="any" placeholder="max dla INNE" /></div></div>}
+                      {item.input === "crimp" && <div className="crimp-config"><select name={`${item.code}_preset`} defaultValue=""><option value="" disabled>Wybierz konfigurację materiałową</option>{dictionary.map((value) => <option key={value} value={value}>{value}</option>)}</select><div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" placeholder="min dla INNE" /><span>–</span><input name={`${item.code}_max`} type="number" step="any" placeholder="max dla INNE" /></div></div>}
                     </div>
                   );
                 })}
