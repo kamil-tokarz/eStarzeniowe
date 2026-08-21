@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { loginAction } from "./actions";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const user = await getCurrentUser();
@@ -26,7 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p>Jedno miejsce do planowania badań, pracy Laboratorium i obserwowania wyników.</p>
         </div>
 
-        <form action={loginAction} className="login-form">
+        <form action="/api/auth/login" method="post" className="login-form">
           <label>
             Login
             <input name="login" autoComplete="username" defaultValue="admin" required />
