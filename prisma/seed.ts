@@ -3,7 +3,6 @@ import {
   PrismaClient,
   SampleRole,
   StandardStatus,
-  TestValueType,
   UserRole,
 } from "../generated/prisma/client";
 import { hashPassword } from "../lib/password";
@@ -42,60 +41,6 @@ async function main() {
     });
   }
 
-  const definitions = [
-    ["WEIGHT", "Waga", "Pomiary", TestValueType.NUMBER, "g"],
-    ["PRESSURE", "Ciśnienie", "Pomiary", TestValueType.NUMBER, "bar"],
-    ["PH", "pH", "Fizykochemia", TestValueType.NUMBER, null],
-    ["DENSITY", "Gęstość", "Fizykochemia", TestValueType.NUMBER, "g/ml"],
-    ["APPEARANCE", "Wygląd", "Sensoryka", TestValueType.DICTIONARY, null],
-    ["ODOR", "Zapach", "Sensoryka", TestValueType.DICTIONARY, null],
-    ["COLOR", "Barwa", "Sensoryka", TestValueType.DICTIONARY, null],
-    ["SPRAY_TYPE", "Rodzaj rozpyłu", "Rozpył", TestValueType.DICTIONARY, null],
-    ["SPRAY_RATE", "Szybkość rozpylania", "Rozpył", TestValueType.NUMBER, "g/s"],
-    ["SPRAY_DIAMETER", "Średnica rozpyłu", "Rozpył", TestValueType.NUMBER, "cm"],
-    ["STEM_HEIGHT", "Wysokość trzpienia", "Rozpył", TestValueType.NUMBER, "mm"],
-    ["CRIMP_WIDTH", "Szerokość zagniotu", "Zagniot", TestValueType.NUMBER, "mm"],
-    ["CRIMP_HEIGHT", "Wysokość zagniotu", "Zagniot", TestValueType.NUMBER, "mm"],
-    ["EMPTYING", "Opróżnialność", "Fizykochemia", TestValueType.NUMBER, "%"],
-    ["FLASH_POINT", "Flesh point", "Fizykochemia", TestValueType.NUMBER, "°C"],
-    ["SPRAYTEC", "Spraytec", "Funkcjonalne", TestValueType.BOOLEAN, null],
-  ] as const;
-
-  for (let i = 0; i < definitions.length; i++) {
-    const [code, name, category, valueType, unit] = definitions[i];
-    await prisma.testDefinition.upsert({
-      where: { code },
-      update: { name, category, valueType, unit, active: true, sortOrder: i + 1 },
-      create: { code, name, category, valueType, unit, active: true, sortOrder: i + 1 },
-    });
-  }
-
-  const dictionaryValues: Record<string, string[]> = {
-    appearance: ["Bez zmian", "Jednorodny", "Niejednorodny", "Rozwarstwienie", "Osad"],
-    odor: ["Bez zmian", "Charakterystyczny", "Zmieniony", "Obcy"],
-    color: ["Bez zmian", "Zgodna ze wzorcem", "Jaśniejsza", "Ciemniejsza", "Zmieniona"],
-    spray: ["Prawidłowy", "Strumień", "Mgła", "Niejednorodny", "Przerywany"],
-    microbiology: [
-      "Ogólna liczba drobnoustrojów tlenowych",
-      "Drożdże i pleśnie",
-      "Pseudomonas aeruginosa",
-      "Staphylococcus aureus",
-      "Candida albicans",
-      "Escherichia coli",
-    ],
-  };
-
-  for (const [category, values] of Object.entries(dictionaryValues)) {
-    for (let i = 0; i < values.length; i++) {
-      const value = values[i];
-      await prisma.dictionaryEntry.upsert({
-        where: { category_value: { category, value } },
-        update: { active: true, sortOrder: i + 1 },
-        create: { category, value, active: true, sortOrder: i + 1 },
-      });
-    }
-  }
-
   const standard = await prisma.stabilityStandard.upsert({
     where: { name: "Standard demonstracyjny 6M" },
     update: {},
@@ -122,7 +67,7 @@ async function main() {
   for (const definition of standardDefinitions) {
     await prisma.standardSampleDefinition.upsert({
       where: { standardId_code: { standardId: standard.id, code: definition.code } },
-      update: definition,
+      update: {},
       create: { standardId: standard.id, ...definition },
     });
   }
@@ -149,7 +94,7 @@ async function main() {
     });
   }
 
-  console.log("Seed bazowy zakończony. Konta testowe gotowe, brak zleceń demonstracyjnych.");
+  console.log("Seed bazowy: konta i dane referencyjne gotowe, 0 zleceń demonstracyjnych.");
 }
 
 main().finally(async () => prisma.$disconnect());
