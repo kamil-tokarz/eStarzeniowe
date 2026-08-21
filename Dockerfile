@@ -27,5 +27,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/generated ./generated
+# Seed runs inside the runtime container and imports the password helper.
+COPY --from=builder /app/lib ./lib
 EXPOSE 3000
 CMD ["npm", "start"]
