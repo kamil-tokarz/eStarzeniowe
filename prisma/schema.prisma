@@ -144,38 +144,39 @@ model StandardSampleDefinition {
 }
 
 model Study {
-  id                      String          @id @default(cuid())
-  studyNumber             String          @unique
-  projectName             String
-  clientId                String
-  etsNumber               String?
-  productionDate          DateTime
-  startDate               DateTime
+  id                        String             @id @default(cuid())
+  studyNumber               String             @unique
+  projectName               String
+  clientId                  String
+  etsNumber                 String?
+  productionDate            DateTime
+  startDate                 DateTime
   responsibleTechnologistId String
-  createdById             String
-  aerosol                 Boolean         @default(false)
-  gasType                  String?
-  gasWeightG               Float?
-  fillWeightG              Float?
-  totalWeightG             Float?
-  volumeMl                 Float?
-  internalTest             Boolean        @default(true)
-  purpose                  String?
-  status                   StudyStatus     @default(DRAFT)
-  standardId               String?
-  handedToLabAt            DateTime?
-  completedAt              DateTime?
-  cancelledAt              DateTime?
-  cancellationReason       String?
-  interruptedAt            DateTime?
-  interruptionReason       String?
-  createdAt                DateTime        @default(now())
-  updatedAt                DateTime        @updatedAt
-  client                    Client          @relation(fields: [clientId], references: [id])
-  responsibleTechnologist  User            @relation("ResponsibleTechnologist", fields: [responsibleTechnologistId], references: [id])
-  createdBy                 User            @relation("CreatedBy", fields: [createdById], references: [id])
+  createdById               String
+  aerosol                   Boolean            @default(false)
+  gasType                   String?
+  gasWeightG                Float?
+  fillWeightG               Float?
+  totalWeightG              Float?
+  volumeMl                  Float?
+  internalTest              Boolean            @default(true)
+  purpose                   String?
+  status                    StudyStatus        @default(DRAFT)
+  standardId                String?
+  handedToLabAt             DateTime?
+  completedAt               DateTime?
+  cancelledAt               DateTime?
+  cancellationReason        String?
+  interruptedAt             DateTime?
+  interruptionReason        String?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  client                    Client             @relation(fields: [clientId], references: [id])
+  responsibleTechnologist   User               @relation("ResponsibleTechnologist", fields: [responsibleTechnologistId], references: [id])
+  createdBy                 User               @relation("CreatedBy", fields: [createdById], references: [id])
   standard                  StabilityStandard? @relation(fields: [standardId], references: [id])
   components                StudyComponent[]
+  substances                StudySubstance[]
   criteria                  StudyCriterion[]
   samples                   Sample[]
   auditEvents               AuditEvent[]
@@ -187,27 +188,41 @@ model Study {
 }
 
 model StudyComponent {
-  id         String @id @default(cuid())
-  studyId    String
-  kind       String
-  code       String?
-  name       String
-  supplier   String?
-  study      Study  @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  studyId  String
+  kind     String
+  code     String?
+  name     String
+  supplier String?
+  study    Study  @relation(fields: [studyId], references: [id], onDelete: Cascade)
 
   @@index([studyId])
 }
 
+model StudySubstance {
+  id        String  @id @default(cuid())
+  studyId   String
+  name      String
+  present   Boolean @default(true)
+  minValue  Float?
+  maxValue  Float?
+  sortOrder Int     @default(0)
+  study     Study   @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+  @@unique([studyId, name])
+  @@index([studyId, sortOrder])
+}
+
 model TestDefinition {
-  id            String          @id @default(cuid())
-  code          String          @unique
+  id            String           @id @default(cuid())
+  code          String           @unique
   name          String
   category      String
   valueType     TestValueType
   unit          String?
-  active        Boolean         @default(true)
+  active        Boolean          @default(true)
   dictionaryKey String?
-  sortOrder     Int             @default(0)
+  sortOrder     Int              @default(0)
   criteria      StudyCriterion[]
   sampleTests   SampleTest[]
 }
@@ -249,32 +264,32 @@ model CriterionVersion {
 }
 
 model Sample {
-  id                     String                @id @default(cuid())
-  studyId                String
-  code                   String
-  role                   SampleRole
-  checkpointLabel        String?
-  checkpointDays         Int?
-  nominalDate            DateTime?
-  storageCondition       String
-  position               String?
-  executionStatus        SampleExecutionStatus @default(NOT_STARTED)
-  referenceStatus        ReferenceStatus?
-  activatedAt            DateTime?
-  activatedById          String?
-  sourceSampleId         String?
-  sourceTestResultId     String?
-  activationReason       String?
-  completedAt            DateTime?
-  notes                  String?
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
-  study                   Study                 @relation(fields: [studyId], references: [id], onDelete: Cascade)
-  initialMeasurement     InitialMeasurement?
-  tests                   SampleTest[]
-  microbiologyResult     MicrobiologyResult?
-  sourceSample            Sample?               @relation("ReferenceSourceSample", fields: [sourceSampleId], references: [id])
-  referenceUses           Sample[]               @relation("ReferenceSourceSample")
+  id                 String                @id @default(cuid())
+  studyId            String
+  code               String
+  role               SampleRole
+  checkpointLabel    String?
+  checkpointDays     Int?
+  nominalDate        DateTime?
+  storageCondition   String
+  position           String?
+  executionStatus    SampleExecutionStatus @default(NOT_STARTED)
+  referenceStatus    ReferenceStatus?
+  activatedAt        DateTime?
+  activatedById      String?
+  sourceSampleId     String?
+  sourceTestResultId String?
+  activationReason   String?
+  completedAt        DateTime?
+  notes              String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  study              Study                 @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  initialMeasurement InitialMeasurement?
+  tests              SampleTest[]
+  microbiologyResult MicrobiologyResult?
+  sourceSample       Sample?               @relation("ReferenceSourceSample", fields: [sourceSampleId], references: [id])
+  referenceUses      Sample[]               @relation("ReferenceSourceSample")
 
   @@unique([studyId, code])
   @@index([studyId, nominalDate])
@@ -282,17 +297,17 @@ model Sample {
 }
 
 model InitialMeasurement {
-  id                        String   @id @default(cuid())
-  sampleId                  String   @unique
-  initialWeightG            Float?
-  initialPressureBar        Float?
-  weightNotPerformed        Boolean  @default(false)
-  weightNotPerformedReason  String?
-  pressureNotPerformed      Boolean  @default(false)
+  id                         String   @id @default(cuid())
+  sampleId                   String   @unique
+  initialWeightG             Float?
+  initialPressureBar         Float?
+  weightNotPerformed         Boolean  @default(false)
+  weightNotPerformedReason   String?
+  pressureNotPerformed       Boolean  @default(false)
   pressureNotPerformedReason String?
-  recordedById              String?
-  recordedAt                DateTime?
-  sample                    Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  recordedById               String?
+  recordedAt                 DateTime?
+  sample                     Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
 }
 
 model SampleTest {
@@ -313,39 +328,39 @@ model SampleTest {
 }
 
 model TestResult {
-  id                     String          @id @default(cuid())
-  sampleTestId           String          @unique
-  state                  ResultState     @default(RECORDED)
-  numericValue           Float?
-  textValue              String?
-  booleanValue           Boolean?
-  notPerformedReason     String?
-  evaluationAtEntry      Evaluation      @default(NOT_APPLICABLE)
-  currentEvaluation      Evaluation      @default(NOT_APPLICABLE)
+  id                        String            @id @default(cuid())
+  sampleTestId              String            @unique
+  state                     ResultState       @default(RECORDED)
+  numericValue              Float?
+  textValue                 String?
+  booleanValue              Boolean?
+  notPerformedReason        String?
+  evaluationAtEntry         Evaluation        @default(NOT_APPLICABLE)
+  currentEvaluation         Evaluation        @default(NOT_APPLICABLE)
   criterionVersionAtEntryId String?
-  authorId               String
-  version                Int             @default(1)
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
-  sampleTest             SampleTest      @relation(fields: [sampleTestId], references: [id], onDelete: Cascade)
-  criterionVersionAtEntry CriterionVersion? @relation("CriterionAtEntry", fields: [criterionVersionAtEntryId], references: [id])
-  author                 User            @relation("ResultAuthor", fields: [authorId], references: [id])
-  history                TestResultHistory[]
+  authorId                  String
+  version                   Int               @default(1)
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+  sampleTest                SampleTest        @relation(fields: [sampleTestId], references: [id], onDelete: Cascade)
+  criterionVersionAtEntry   CriterionVersion? @relation("CriterionAtEntry", fields: [criterionVersionAtEntryId], references: [id])
+  author                    User              @relation("ResultAuthor", fields: [authorId], references: [id])
+  history                   TestResultHistory[]
 
   @@index([currentEvaluation])
 }
 
 model TestResultHistory {
-  id                 String      @id @default(cuid())
+  id                 String     @id @default(cuid())
   testResultId       String
   previousValue      String?
   newValue           String?
   previousEvaluation Evaluation
   newEvaluation      Evaluation
   authorId           String
-  createdAt          DateTime    @default(now())
-  testResult         TestResult  @relation(fields: [testResultId], references: [id], onDelete: Cascade)
-  author             User        @relation("ResultHistoryAuthor", fields: [authorId], references: [id])
+  createdAt          DateTime   @default(now())
+  testResult         TestResult @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  author             User       @relation("ResultHistoryAuthor", fields: [authorId], references: [id])
 
   @@index([testResultId, createdAt])
 }
