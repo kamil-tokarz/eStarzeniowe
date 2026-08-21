@@ -19,14 +19,15 @@ export async function saveReportFile(file: File, sampleId: string) {
   const storageName = `${sampleId}-${Date.now()}-${randomBytes(6).toString("hex")}${ext}`;
   const absolutePath = path.join(uploadRoot, storageName);
   const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(absolutePath, bytes);
+  await writeFile(/* turbopackIgnore: true */ absolutePath, bytes);
   return { storageName, originalName: file.name || `raport${ext}`, mimeType: file.type };
 }
 
 export async function readReportFile(storageName: string) {
   const safeName = path.basename(storageName);
   if (safeName !== storageName) throw new Error("Nieprawidłowa ścieżka pliku.");
-  return readFile(path.join(uploadRoot, safeName));
+  const absolutePath = path.join(uploadRoot, safeName);
+  return readFile(/* turbopackIgnore: true */ absolutePath);
 }
 
 export async function deleteReportFile(storageName: string | null | undefined) {
@@ -34,7 +35,8 @@ export async function deleteReportFile(storageName: string | null | undefined) {
   const safeName = path.basename(storageName);
   if (safeName !== storageName) return;
   try {
-    await unlink(path.join(uploadRoot, safeName));
+    const absolutePath = path.join(uploadRoot, safeName);
+    await unlink(/* turbopackIgnore: true */ absolutePath);
   } catch {
     // Plik mógł już zostać usunięty; rekord bazy pozostaje źródłem prawdy.
   }
