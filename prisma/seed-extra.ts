@@ -7,11 +7,30 @@ if (!connectionString) throw new Error("DATABASE_URL is required for extra seed"
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 const definitions = [
+  ["WEIGHT", "Waga", "Pomiary", TestValueType.NUMBER, "g", null],
+  ["PRESSURE", "Ciśnienie bieżące", "Pomiary", TestValueType.NUMBER, "bar", null],
+  ["APPEARANCE", "Wygląd", "Sensoryka", TestValueType.DICTIONARY, null, "appearance"],
+  ["ODOR", "Zapach", "Sensoryka", TestValueType.DICTIONARY, null, "odor"],
+  ["COLOR", "Barwa", "Sensoryka", TestValueType.DICTIONARY, null, "color"],
+  ["SPRAY_TYPE", "Rozpył", "Rozpył", TestValueType.DICTIONARY, null, "spray"],
+  ["SPRAY_RATE", "Prędkość rozpyłu", "Rozpył", TestValueType.NUMBER, "g/sek", null],
+  ["SPRAY_DIAMETER", "Średnica rozpyłu", "Rozpył", TestValueType.NUMBER, "cm", null],
+  ["STEM_HEIGHT", "Wysokość kominka/stemu", "Rozpył", TestValueType.NUMBER, "mm", null],
+  ["CRIMP_WIDTH", "Szerokość zagniotu", "Zagniot", TestValueType.NUMBER, "mm", null],
+  ["CRIMP_HEIGHT", "Wysokość zagniotu", "Zagniot", TestValueType.NUMBER, "mm", null],
+  ["EMPTYING", "Opróżnialność", "Fizykochemia", TestValueType.NUMBER, "%", null],
+  ["PH", "pH", "Fizykochemia", TestValueType.NUMBER, null, null],
+  ["DENSITY", "Gęstość", "Fizykochemia", TestValueType.NUMBER, "g/cm³", null],
+  ["FLASH_POINT", "Flesh point", "Fizykochemia", TestValueType.NUMBER, "°C", null],
   ["PRESSURE_20", "Ciśnienie w 20°C", "Fizykochemia", TestValueType.NUMBER, "bar", null],
   ["PRESSURE_50", "Ciśnienie w 50°C", "Fizykochemia", TestValueType.NUMBER, "bar", null],
+  ["SPRAYTEC", "Badanie Spraytec", "Funkcjonalne", TestValueType.BOOLEAN, null, null],
 ] as const;
 
 const dictionaries: Record<string, string[]> = {
+  appearance: ["Bez zmian", "Jednorodny", "Niejednorodny", "Rozwarstwienie", "Osad"],
+  odor: ["Bez zmian", "Charakterystyczny", "Zmieniony", "Obcy"],
+  color: ["Bez zmian", "Zgodna ze wzorcem", "Jaśniejsza", "Ciemniejsza", "Zmieniona"],
   spray: ["Mgiełka", "Jet", "Emulsja typu spray on"],
   crimp_width_setup: [
     "STAL - ALU 26,9 - 27,1",
@@ -57,13 +76,12 @@ const dictionaries: Record<string, string[]> = {
 };
 
 async function main() {
-  const currentMax = await prisma.testDefinition.aggregate({ _max: { sortOrder: true } });
-  let sortOrder = (currentMax._max.sortOrder ?? 0) + 1;
-  for (const [code, name, category, valueType, unit, dictionaryKey] of definitions) {
+  for (let i = 0; i < definitions.length; i++) {
+    const [code, name, category, valueType, unit, dictionaryKey] = definitions[i];
     await prisma.testDefinition.upsert({
       where: { code },
-      update: { name, category, valueType, unit, dictionaryKey, active: true },
-      create: { code, name, category, valueType, unit, dictionaryKey, active: true, sortOrder: sortOrder++ },
+      update: { name, category, valueType, unit, dictionaryKey, active: true, sortOrder: i + 1 },
+      create: { code, name, category, valueType, unit, dictionaryKey, active: true, sortOrder: i + 1 },
     });
   }
 
