@@ -28,9 +28,67 @@ const definitions = [
 ] as const;
 
 const dictionaries: Record<string, string[]> = {
-  appearance: ["Bez zmian", "Jednorodny", "Niejednorodny", "Rozwarstwienie", "Osad"],
-  odor: ["Bez zmian", "Charakterystyczny", "Zmieniony", "Obcy"],
-  color: ["Bez zmian", "Zgodna ze wzorcem", "Jaśniejsza", "Ciemniejsza", "Zmieniona"],
+  appearance: [
+    "Jednorodna emulsja",
+    "Lepka emulsja",
+    "Nisko lepka emulsja",
+    "Niestabilna w czasie emulsja",
+    "Piana",
+    "Mgiełka",
+    "Lepki żel",
+    "Nisko lepki żel",
+    "Mętny żel",
+    "Klarowny żel",
+    "Jednorodny żel",
+    "Jednorodny, przeźroczysty roztwór",
+    "Klarowy roztwór",
+    "Klarowy roztwór, bez zanieczyszczeń mechanicznych",
+    "Klarowny oleisty roztwór",
+    "Jednorodny roztwór",
+    "Klarowny roztwór do lekko mętnego",
+    "Roztwór niestabilny w czasie",
+    "Lepki olej",
+    "Lepki smar",
+    "Gęsta, jednorodna emulsja",
+    "Przezroczysta ciecz, bez zanieczyszczeń mechanicznych",
+    "Zawiesina",
+    "Gęsta, klarowna ciecz",
+    "Klarowna oleista ciecz",
+    "Aerozol w postaci proszku",
+    "Aerozol w postaci mgiełki",
+    "Emulsja typu spray on",
+    "Pasta, zgodna ze wzorcem",
+    "Mgiełka w postaci dawek",
+  ],
+  odor: [
+    "Charakterystyczny dla użytych surowców",
+    "Charakterystyczny dla użytej kompozycji zapachowej",
+  ],
+  color: [
+    "Słomkowa",
+    "Jasnożółta",
+    "Kremowa",
+    "Beżowa",
+    "Kremowa do białej",
+    "Bezbarwna",
+    "Biała",
+    "Żółta",
+    "Jasno niebieska",
+    "Jasno różowa",
+    "Niebieska",
+    "Różowa",
+    "Delikatnie słomkowa",
+    "Biała do kremowej",
+    "Biała do jasnokremowej",
+    "Bezbarwna do słomkowej",
+    "Jasnożółta do zielonawożółtej",
+    "Bezbarwna do jasnobeżowej",
+    "Bezbarwny do białego",
+    "Błyszcząca, grafitowa",
+    "Błyszczący brąz (miedziany)",
+    "Jasnozielona, półprzezroczysta",
+    "Żółta do brązowej",
+  ],
   spray: ["Mgiełka", "Jet", "Emulsja typu spray on"],
   crimp_width_setup: [
     "STAL - ALU 26,9 - 27,1",
@@ -46,6 +104,40 @@ const dictionaries: Record<string, string[]> = {
     "ALU - ALU | 5,0 - 5,2",
     "ALU/STAL | 4,9 - 5,0",
     "INNE",
+  ],
+  component_kind: [
+    "Pojemnik - Stalowy",
+    "Pojemnik - Aluminiowy",
+    "Pojemnik - Butelka",
+    "Pojemnik - Tuba",
+    "Pojemnik - Słoik",
+    "Pojemnik - Airless",
+    "Pojemnik - Inne",
+    "System dozujący - Zawór aluminiowy",
+    "System dozujący - Zawór stalowy",
+    "System dozujący - Atomizer",
+    "System dozujący - Trigger",
+    "System dozujący - Dozownik",
+    "System dozujący - Pompka",
+    "System dozujący - Dropper",
+    "System dozujący - Inne",
+    "Element aplikacyjny - Dyszka",
+    "Element aplikacyjny - Aplikator",
+    "Element aplikacyjny - Spray-cap",
+    "Element aplikacyjny - Inne",
+    "Zamknięcie - Nasadka",
+    "Zamknięcie - Nakrętka",
+    "Zamknięcie - Flip-top",
+    "Zamknięcie - Adapter",
+    "Zamknięcie - Maska",
+    "Zamknięcie - Inne",
+    "Oznaczenie - Etykieta",
+    "Oznaczenie - Trójkąt dla niewidomych",
+    "Oznaczenie - Sticker",
+    "Oznaczenie - Inne",
+    "Element dodatkowy - Kulka",
+    "Element dodatkowy - Rurka",
+    "Element dodatkowy - Inne",
   ],
   microbiology: [
     "Liczba bakterii tlenowych mezofilnych wg PN-EN ISO 21149:2017-07",
@@ -75,6 +167,8 @@ const dictionaries: Record<string, string[]> = {
   ],
 };
 
+const sourceDictionaryCategories = Object.keys(dictionaries);
+
 async function main() {
   for (let i = 0; i < definitions.length; i++) {
     const [code, name, category, valueType, unit, dictionaryKey] = definitions[i];
@@ -85,25 +179,15 @@ async function main() {
     });
   }
 
-  // Te kategorie pochodzą bezpośrednio z obecnego workflow i są źródłem prawdy.
-  // Usuwamy uproszczone wartości demonstracyjne z seed.ts, aby po świeżym seedzie
-  // katalog mikrobiologii miał dokładnie 24 pozycje, a rozpył dokładnie 3 warianty.
-  await prisma.dictionaryEntry.deleteMany({
-    where: { category: { in: ["spray", "crimp_width_setup", "crimp_height_setup", "microbiology"] } },
-  });
+  await prisma.dictionaryEntry.deleteMany({ where: { category: { in: sourceDictionaryCategories } } });
 
   for (const [category, values] of Object.entries(dictionaries)) {
     for (let i = 0; i < values.length; i++) {
-      const value = values[i];
-      await prisma.dictionaryEntry.upsert({
-        where: { category_value: { category, value } },
-        update: { active: true, sortOrder: i + 1 },
-        create: { category, value, active: true, sortOrder: i + 1 },
-      });
+      await prisma.dictionaryEntry.create({ data: { category, value: values[i], active: true, sortOrder: i + 1 } });
     }
   }
 
-  console.log("Seed extra zakończony: pełny katalog badań i dokładnie 24 badania mikrobiologiczne.");
+  console.log("Seed extra zakończony: kryteria i słowniki z workflow, 24 badania mikrobiologiczne.");
 }
 
 main().finally(() => prisma.$disconnect());
