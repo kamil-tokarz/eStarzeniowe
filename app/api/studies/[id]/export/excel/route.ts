@@ -1,4 +1,4 @@
-import ExcelJS from "@excel.js/exceljs";
+import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { criterionValue, getStudyExportData, resultValue } from "@/lib/study-export";
@@ -116,8 +116,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const output = await workbook.xlsx.writeBuffer();
-  const bytes = new Uint8Array(output as ArrayBuffer);
-  return new NextResponse(bytes, {
+  return new NextResponse(new Uint8Array(output), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${study.studyNumber}.xlsx"`,
