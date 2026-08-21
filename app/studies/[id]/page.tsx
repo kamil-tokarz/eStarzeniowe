@@ -147,11 +147,12 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
           {study.criteria.map((criterion) => {
             const v = criterion.currentVersion;
             if (!v) return null;
+            const numericCriterion = criterion.kind === CriterionKind.RANGE || criterion.kind === CriterionKind.MINIMUM || criterion.kind === CriterionKind.MAXIMUM;
             return <details className="criterion-editor" key={criterion.id}>
               <summary><span><strong>{criterion.testDefinition.name}</strong><small>Aktualnie v{v.version}</small></span><span>Zmień wartość kryterium</span></summary>
               <form action={changeCriterionAction}>
                 <input type="hidden" name="criterionId" value={criterion.id} />
-                {[CriterionKind.RANGE, CriterionKind.MINIMUM, CriterionKind.MAXIMUM].includes(criterion.kind) ? <div className="criterion-editor-values"><label>Minimum<input name="minValue" type="number" step="any" defaultValue={v.minValue ?? ""} /></label><label>Maksimum<input name="maxValue" type="number" step="any" defaultValue={v.maxValue ?? ""} /></label></div> : criterion.kind === CriterionKind.EXPECTED_VALUE ? <label>Wartość oczekiwana<input name="expectedText" defaultValue={v.expectedText ?? ""} required /></label> : criterion.kind === CriterionKind.BOOLEAN_EXPECTED ? <label>Wartość oczekiwana<select name="expectedBoolean" defaultValue={v.expectedBoolean ? "true" : "false"}><option value="true">TAK</option><option value="false">NIE</option></select></label> : null}
+                {numericCriterion ? <div className="criterion-editor-values"><label>Minimum<input name="minValue" type="number" step="any" defaultValue={v.minValue ?? ""} /></label><label>Maksimum<input name="maxValue" type="number" step="any" defaultValue={v.maxValue ?? ""} /></label></div> : criterion.kind === CriterionKind.EXPECTED_VALUE ? <label>Wartość oczekiwana<input name="expectedText" defaultValue={v.expectedText ?? ""} required /></label> : criterion.kind === CriterionKind.BOOLEAN_EXPECTED ? <label>Wartość oczekiwana<select name="expectedBoolean" defaultValue={v.expectedBoolean ? "true" : "false"}><option value="true">TAK</option><option value="false">NIE</option></select></label> : null}
                 <label className="criterion-reason">Uzasadnienie zmiany *<input name="reason" placeholder="Dlaczego kryterium się zmienia?" required /></label>
                 <button className="btn btn-primary" type="submit">Zapisz nową wersję</button>
               </form>
