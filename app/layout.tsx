@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./application.css";
+import "./operational.css";
 
 export const metadata: Metadata = {
   title: "eStarzeniowe · JagoPro",
