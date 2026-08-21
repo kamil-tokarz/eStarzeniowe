@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function inputDate(date: Date) { return date.toISOString().slice(0, 10); }
-const dictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology"];
+const dictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind"];
 
 export default async function EditStudyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   const user = await requireUser();
@@ -31,6 +31,7 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
 
   const dictionaryValues: Record<string, string[]> = {};
   for (const entry of dictionaries) (dictionaryValues[entry.category] ??= []).push(entry.value);
+  const componentKinds = dictionaryValues.component_kind ?? [];
 
   const microComponents = study.components.filter((item) => item.kind === "Badanie mikrobiologiczne");
   const normalComponents = study.components.filter((item) => item.kind !== "Badanie mikrobiologiczne");
@@ -65,7 +66,10 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
         <label className="field">Rodzaj gazu<input name="gasType" defaultValue={study.gasType ?? ""}/></label><label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" defaultValue={study.gasWeightG ?? ""}/></label>
       </div></section>
 
-      <section className="form-section"><div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Możesz zmienić listę do chwili przekazania.</p></div></div><div className="component-table"><div className="component-row component-head"><span>Rodzaj</span><span>Kod</span><span>Nazwa</span><span>Dostawca</span></div>{components.map((item,index)=><div className="component-row" key={index}><input name={`componentKind_${index+1}`} defaultValue={item?.kind ?? ""} placeholder="np. Pojemnik"/><input name={`componentCode_${index+1}`} defaultValue={item?.code ?? ""} placeholder="Kod"/><input name={`componentName_${index+1}`} defaultValue={item?.name ?? ""} placeholder="Nazwa komponentu"/><input name={`componentSupplier_${index+1}`} defaultValue={item?.supplier ?? ""} placeholder="Dostawca"/></div>)}</div></section>
+      <section className="form-section"><div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Możesz zmienić listę do chwili przekazania.</p></div></div><div className="component-table"><div className="component-row component-head"><span>Rodzaj</span><span>Kod</span><span>Nazwa</span><span>Dostawca</span></div>{components.map((item,index)=>{
+        const kinds = item?.kind && !componentKinds.includes(item.kind) ? [item.kind, ...componentKinds] : componentKinds;
+        return <div className="component-row" key={index}><select name={`componentKind_${index+1}`} defaultValue={item?.kind ?? ""}><option value="">Wybierz rodzaj</option>{kinds.map((value)=><option key={value} value={value}>{value}</option>)}</select><input name={`componentCode_${index+1}`} defaultValue={item?.code ?? ""} placeholder="Kod"/><input name={`componentName_${index+1}`} defaultValue={item?.name ?? ""} placeholder="Nazwa komponentu"/><input name={`componentSupplier_${index+1}`} defaultValue={item?.supplier ?? ""} placeholder="Dostawca"/></div>;
+      })}</div></section>
 
       <section className="form-section"><div className="form-section-head"><span className="step-number">04</span><div><h2>Kryteria akceptacji</h2><p>W DRAFT możesz zmieniać zarówno zakres badań, jak i wartości kryteriów.</p></div></div>
         <div className="criteria-sections">
@@ -78,9 +82,9 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
                 <label className="criterion-toggle"><input name={`criterion_${item.code}`} type="checkbox" defaultChecked={Boolean(current)}/><span><strong>{item.label}</strong><small>{item.unit ? `${item.input === "minimum" ? "minimum" : "zakres"} · ${item.unit}` : item.input === "expected" ? "wartość oczekiwana" : item.input === "boolean" ? "wykonanie / zgodność" : "kryterium"}</small></span></label>
                 {item.input === "range" && <div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" defaultValue={version?.minValue ?? item.defaultMin ?? ""} placeholder="min"/><span>–</span><input name={`${item.code}_max`} type="number" step="any" defaultValue={version?.maxValue ?? item.defaultMax ?? ""} placeholder="max"/></div>}
                 {item.input === "minimum" && <input name={`${item.code}_min`} type="number" step="any" defaultValue={version?.minValue ?? ""} placeholder="minimum"/>}
-                {item.input === "expected" && <select name={`${item.code}_expected`} defaultValue={version?.expectedText ?? item.defaultExpected ?? dictionary[0] ?? ""}><option value="" disabled>Wybierz wartość</option>{dictionary.map((value)=><option key={value} value={value}>{value}</option>)}</select>}
+                {item.input === "expected" && <select name={`${item.code}_expected`} defaultValue={version?.expectedText ?? ""}><option value="" disabled>Wybierz wartość</option>{dictionary.map((value)=><option key={value} value={value}>{value}</option>)}</select>}
                 {item.input === "boolean" && <div className="criterion-info">Oczekiwana wartość: TAK.</div>}
-                {item.input === "crimp" && <div className="crimp-config"><select name={`${item.code}_preset`} defaultValue={version?.expectedText ?? dictionary[0] ?? ""}><option value="" disabled>Wybierz konfigurację materiałową</option>{dictionary.map((value)=><option key={value} value={value}>{value}</option>)}</select><div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" defaultValue={version?.minValue ?? ""} placeholder="min dla INNE"/><span>–</span><input name={`${item.code}_max`} type="number" step="any" defaultValue={version?.maxValue ?? ""} placeholder="max dla INNE"/></div></div>}
+                {item.input === "crimp" && <div className="crimp-config"><select name={`${item.code}_preset`} defaultValue={version?.expectedText ?? ""}><option value="" disabled>Wybierz konfigurację materiałową</option>{dictionary.map((value)=><option key={value} value={value}>{value}</option>)}</select><div className="criterion-range"><input name={`${item.code}_min`} type="number" step="any" defaultValue={version?.minValue ?? ""} placeholder="min dla INNE"/><span>–</span><input name={`${item.code}_max`} type="number" step="any" defaultValue={version?.maxValue ?? ""} placeholder="max dla INNE"/></div></div>}
               </div>;
             })}
           </div></div>)}
