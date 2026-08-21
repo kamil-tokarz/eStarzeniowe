@@ -3,6 +3,8 @@ name: eStarzeniowe CI
 on:
   push:
     branches: [main, ci/checkpoint]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
