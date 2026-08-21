@@ -132,7 +132,7 @@ export async function changeCriterionAction(formData: FormData) {
   let expectedText = criterion.currentVersion.expectedText;
   let expectedBoolean = criterion.currentVersion.expectedBoolean;
 
-  if ([CriterionKind.RANGE, CriterionKind.MINIMUM, CriterionKind.MAXIMUM].includes(criterion.kind)) {
+  if (criterion.kind === CriterionKind.RANGE || criterion.kind === CriterionKind.MINIMUM || criterion.kind === CriterionKind.MAXIMUM) {
     minValue = numberOrNull(formData.get("minValue"));
     maxValue = numberOrNull(formData.get("maxValue"));
     if (criterion.kind === CriterionKind.RANGE && (minValue == null || maxValue == null)) throw new Error("Zakres wymaga wartości minimalnej i maksymalnej.");
