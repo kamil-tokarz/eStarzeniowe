@@ -3,11 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { StandardStatus, StudyStatus, UserRole } from "@/generated/prisma/client";
 import { criterionCatalog, criterionGroups } from "@/lib/criterion-catalog";
 import { AppShell } from "@/components/app-shell";
+import { RepeatableComponentTable, RepeatableSubstanceTable } from "@/components/repeatable-tables";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function inputDate(date: Date) { return date.toISOString().slice(0, 10); }
-const dictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind"];
+const dictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind", "gas_type", "study_purpose"];
 
 export default async function EditStudyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   const user = await requireUser();
@@ -17,7 +18,14 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
 
   const study = await prisma.study.findUnique({
     where: { id },
-    include: { components: true, criteria: { include: { testDefinition: true, currentVersion: true } }, client: true, responsibleTechnologist: true, standard: true },
+    include: {
+      components: true,
+      substances: { orderBy: { sortOrder: "asc" } },
+      criteria: { include: { testDefinition: true, currentVersion: true } },
+      client: true,
+      responsibleTechnologist: true,
+      standard: true,
+    },
   });
   if (!study) notFound();
   if (study.status !== StudyStatus.DRAFT) redirect(`/studies/${id}`);
@@ -32,14 +40,17 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
   const dictionaryValues: Record<string, string[]> = {};
   for (const entry of dictionaries) (dictionaryValues[entry.category] ??= []).push(entry.value);
   const componentKinds = dictionaryValues.component_kind ?? [];
+  const purposeValues = study.purpose && !(dictionaryValues.study_purpose ?? []).includes(study.purpose) ? [study.purpose, ...(dictionaryValues.study_purpose ?? [])] : dictionaryValues.study_purpose ?? [];
+  const gasValues = study.gasType && !(dictionaryValues.gas_type ?? []).includes(study.gasType) ? [study.gasType, ...(dictionaryValues.gas_type ?? [])] : dictionaryValues.gas_type ?? [];
 
   const microComponents = study.components.filter((item) => item.kind === "Badanie mikrobiologiczne");
   const normalComponents = study.components.filter((item) => item.kind !== "Badanie mikrobiologiczne");
-  const components = [...normalComponents, ...Array(Math.max(0, 5 - normalComponents.length)).fill(null)].slice(0, 5);
   const selectedMicro = new Set(microComponents.map((item) => item.name));
   const criterionByCode = new Map(study.criteria.map((item) => [item.testDefinition.code, item]));
-  const substances = study.criteria.filter((item) => item.testDefinition.code.startsWith("SUBSTANCE_") || item.testDefinition.category === "Zawartość substancji");
-  const substanceRows = [...substances, ...Array(Math.max(0, 5 - substances.length)).fill(null)].slice(0, 5);
+  const legacySubstances = study.criteria.filter((item) => item.testDefinition.code.startsWith("SUBSTANCE_") || item.testDefinition.category === "Zawartość substancji");
+  const substanceRows = study.substances.length
+    ? study.substances.map((item) => ({ name: item.name, present: item.present, minValue: item.minValue?.toString() ?? "", maxValue: item.maxValue?.toString() ?? "" }))
+    : legacySubstances.map((item) => ({ name: item.currentVersion?.expectedText ?? item.testDefinition.name.replace(/^Zawartość:\s*/, ""), present: true, minValue: item.currentVersion?.minValue?.toString() ?? "", maxValue: item.currentVersion?.maxValue?.toString() ?? "" }));
 
   return <AppShell user={user} active="studies">
     <div className="topline"><div><div className="eyebrow">{study.studyNumber} · wersja robocza</div><h1>Edytuj zlecenie</h1><div className="subtle">Do przekazania do Laboratorium możesz swobodnie zmieniać cały zakres badania.</div></div><Link href={`/studies/${id}`} className="btn btn-secondary">← Wróć do zlecenia</Link></div>
@@ -51,7 +62,7 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
         <label className="field">Technolog odpowiedzialny *<select name="responsibleTechnologistId" defaultValue={study.responsibleTechnologistId} required>{technologists.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="field">Numer ETS<input name="etsNumber" defaultValue={study.etsNumber ?? ""}/></label>
         <label className="field">Typ badania<select name="testType" defaultValue={study.internalTest ? "internal" : "customer"}><option value="internal">Wewnętrzne</option><option value="customer">Dla klienta</option></select></label>
-        <label className="field field-wide">Cel testów<textarea name="purpose" rows={3} defaultValue={study.purpose ?? ""}/></label>
+        <label className="field field-wide">Cel testów<select name="purpose" defaultValue={study.purpose ?? ""}><option value="">Wybierz cel testów</option>{purposeValues.map((value)=><option key={value} value={value}>{value}</option>)}</select></label>
       </div></section>
 
       <section className="form-section"><div className="form-section-head"><span className="step-number">02</span><div><h2>Produkt i terminy</h2><p>Data rozpoczęcia jest bazą dla wszystkich terminów nominalnych.</p></div></div><div className="form-grid form-grid-3">
@@ -61,13 +72,11 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
         <label className="field">Waga nastawu [g]<input name="fillWeightG" type="number" step="0.01" min="0" defaultValue={study.fillWeightG ?? ""}/></label>
         <label className="field">Waga wsadu [g]<input type="number" step="0.01" readOnly value={study.totalWeightG ?? ""} placeholder="nastaw + gaz; przeliczana przy zapisie"/></label>
         <label className="checkbox-card"><input name="aerosol" type="checkbox" defaultChecked={study.aerosol}/><span><strong>Aerozol</strong><small>Po odznaczeniu dane gazu zostaną wyczyszczone.</small></span></label>
-        <label className="field">Rodzaj gazu<input name="gasType" defaultValue={study.gasType ?? ""}/></label><label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" defaultValue={study.gasWeightG ?? ""}/></label>
+        <label className="field">Rodzaj gazu<select name="gasType" defaultValue={study.gasType ?? ""}><option value="">Wybierz rodzaj gazu</option>{gasValues.map((value)=><option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" defaultValue={study.gasWeightG ?? ""}/></label>
       </div><div className="subtle" style={{marginTop: 10}}>Waga wsadu jest wyliczana automatycznie jako waga nastawu + waga gazu. Dla produktu nieaerozolowego jest równa wadze nastawu.</div></section>
 
-      <section className="form-section"><div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Możesz zmienić listę do chwili przekazania.</p></div></div><div className="component-table"><div className="component-row component-head"><span>Rodzaj</span><span>Kod</span><span>Nazwa</span><span>Dostawca</span></div>{components.map((item,index)=>{
-        const kinds = item?.kind && !componentKinds.includes(item.kind) ? [item.kind, ...componentKinds] : componentKinds;
-        return <div className="component-row" key={index}><select name={`componentKind_${index+1}`} defaultValue={item?.kind ?? ""}><option value="">Wybierz rodzaj</option>{kinds.map((value)=><option key={value} value={value}>{value}</option>)}</select><input name={`componentCode_${index+1}`} defaultValue={item?.code ?? ""} placeholder="Kod"/><input name={`componentName_${index+1}`} defaultValue={item?.name ?? ""} placeholder="Nazwa komponentu"/><input name={`componentSupplier_${index+1}`} defaultValue={item?.supplier ?? ""} placeholder="Dostawca"/></div>;
-      })}</div></section>
+      <section className="form-section"><div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Jeden wiersz na start, kolejne dodajesz tylko wtedy, gdy są potrzebne.</p></div></div><RepeatableComponentTable componentKinds={componentKinds} initialRows={normalComponents.map((item)=>({kind:item.kind,code:item.code ?? "",name:item.name,supplier:item.supplier ?? ""}))}/></section>
 
       <section className="form-section"><div className="form-section-head"><span className="step-number">04</span><div><h2>Kryteria akceptacji</h2><p>W DRAFT możesz zmieniać zarówno zakres badań, jak i wartości kryteriów.</p></div></div>
         <div className="criteria-sections">
@@ -86,7 +95,7 @@ export default async function EditStudyPage({ params, searchParams }: { params: 
               </div>;
             })}
           </div></div>)}
-          <div className="criteria-group"><div className="criteria-group-title">Zawartość substancji</div><div className="substance-table"><div className="substance-row substance-head"><span>Substancja</span><span>Minimum [%]</span><span>Maksimum [%]</span></div>{substanceRows.map((item,index)=><div className="substance-row" key={index}><input name={`substanceName_${index+1}`} defaultValue={item?.currentVersion?.expectedText ?? item?.testDefinition.name.replace(/^Zawartość:\s*/, "") ?? ""} placeholder="np. Etanol"/><input name={`substanceMin_${index+1}`} type="number" step="any" defaultValue={item?.currentVersion?.minValue ?? ""} placeholder="min"/><input name={`substanceMax_${index+1}`} type="number" step="any" defaultValue={item?.currentVersion?.maxValue ?? ""} placeholder="max"/></div>)}</div></div>
+          <div className="criteria-group"><div className="criteria-group-title">Zawartość substancji</div><p className="subtle">Substancja / występuje TAK-NIE / MIN / MAX. Liczba pozycji jest dowolna.</p><RepeatableSubstanceTable initialRows={substanceRows}/></div>
         </div>
       </section>
 
