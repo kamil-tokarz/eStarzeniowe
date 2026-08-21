@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/app-shell";
 import { StudyForm } from "@/components/study-form";
 
-const criterionDictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind"];
+const criterionDictionaryCategories = ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind", "gas_type", "study_purpose"];
 
 export default async function NewStudyPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const user = await requireUser();
