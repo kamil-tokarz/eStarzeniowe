@@ -1,17 +1,32 @@
 # eStarzeniowe
 
-Wewnętrzna aplikacja webowa typu LIMS dla JagoPro do obsługi testów stabilności próbek.
+Wewnętrzna aplikacja JagoPro do obsługi testów stabilności: zlecenia Technologa, standardy, próbki, badania wstępne, sprint Laboratorium, wyniki OK/NOK, próbki RF/OOS, mikrobiologia, wersjonowane kryteria i audit trail.
 
-## Cel
+## Uruchomienie środowiska testowego
 
-System ma wspierać pełny cykl testów stabilności: od zlecenia Technologa, przez generowanie próbek i badania wstępne, po tygodniowe sprinty Laboratorium, analizę wyników, zmianę kryteriów akceptacji z historią oraz zakończenie lub przerwanie badania.
+```bash
+docker compose up -d --build
+```
 
-## Zasada projektowa
+Przy **pierwszym** uruchomieniu lub gdy świadomie chcesz odtworzyć dane demonstracyjne:
 
-> System jest dla ludzi, a nie ludzie dla systemu.
+```bash
+docker compose exec app npx prisma db seed
+```
 
-Priorytety: prostota, czytelność, szybkość pracy, elastyczność użytkownika i pełna identyfikowalność danych.
+> `db seed` usuwa i odtwarza dane demonstracyjne. Nie jest wykonywany automatycznie przy restarcie aplikacji.
 
-## Status
+Aplikacja: `http://localhost:3000`
 
-Projekt w fazie bootstrapu i implementacji MVP.
+Konta demonstracyjne po seedzie:
+- `admin / admin`
+- `technolog / test`
+- `laborant / test`
+
+## Dane źródłowe workflow
+
+Seed referencyjny zawiera 24 pozycje mikrobiologii oraz 7 planów standardów odtworzonych z obecnego workflow Comarch BPM (217 definicji próbek). Zaimportowane standardy pozostają w statusie DRAFT do zatwierdzenia przez Administratora, ponieważ etykiety miesięczne są w nowym systemie przeliczane na stałe offsety dni (`1M = 30 dni`).
+
+## CI
+
+Pull request do `main` uruchamia PostgreSQL 17, Prisma, pełny seed, weryfikację danych referencyjnych, ESLint i produkcyjny build Next.js.

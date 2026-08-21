@@ -1,0 +1,406 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  TECHNOLOGIST
+  LAB_TECHNICIAN
+  ADMIN
+}
+
+enum StudyStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  INTERRUPTED
+}
+
+enum StandardStatus {
+  DRAFT
+  ACTIVE
+  WITHDRAWN
+}
+
+enum SampleRole {
+  STANDARD
+  MICROBIOLOGY
+  REFERENCE
+}
+
+enum SampleExecutionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ReferenceStatus {
+  AVAILABLE
+  ACTIVATED
+  COMPLETED
+  UNUSED
+}
+
+enum TestValueType {
+  NUMBER
+  TEXT
+  DICTIONARY
+  BOOLEAN
+}
+
+enum ResultState {
+  RECORDED
+  NOT_PERFORMED
+}
+
+enum Evaluation {
+  OK
+  NOK
+  NOT_APPLICABLE
+}
+
+enum CriterionKind {
+  RANGE
+  MINIMUM
+  MAXIMUM
+  EXPECTED_VALUE
+  BOOLEAN_EXPECTED
+  INFORMATIONAL
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  login              String              @unique
+  name               String
+  passwordHash       String
+  role               UserRole
+  active             Boolean             @default(true)
+  mustChangePassword Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  responsibleStudies Study[]             @relation("ResponsibleTechnologist")
+  createdStudies     Study[]             @relation("CreatedBy")
+  sessions           Session[]
+  results             TestResult[]        @relation("ResultAuthor")
+  resultHistory      TestResultHistory[] @relation("ResultHistoryAuthor")
+  criterionVersions  CriterionVersion[]  @relation("CriterionVersionAuthor")
+  auditEvents        AuditEvent[]        @relation("AuditEventAuthor")
+  microResults       MicrobiologyResult[] @relation("MicroResultAuthor")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  studies   Study[]
+}
+
+model StabilityStandard {
+  id          String                     @id @default(cuid())
+  name        String                     @unique
+  description String?
+  status      StandardStatus             @default(DRAFT)
+  locked      Boolean                    @default(false)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  definitions StandardSampleDefinition[]
+  studies     Study[]
+}
+
+model StandardSampleDefinition {
+  id               String            @id @default(cuid())
+  standardId       String
+  code             String
+  checkpointLabel  String?
+  checkpointDays   Int?
+  storageCondition String
+  position         String?
+  role             SampleRole        @default(STANDARD)
+  quantity         Int               @default(1)
+  sortOrder        Int               @default(0)
+  standard         StabilityStandard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+
+  @@unique([standardId, code])
+  @@index([standardId, sortOrder])
+}
+
+model Study {
+  id                        String             @id @default(cuid())
+  studyNumber               String             @unique
+  projectName               String
+  clientId                  String
+  etsNumber                 String?
+  productionDate            DateTime
+  startDate                 DateTime
+  responsibleTechnologistId String
+  createdById               String
+  aerosol                   Boolean            @default(false)
+  gasType                   String?
+  gasWeightG                Float?
+  fillWeightG               Float?
+  totalWeightG              Float?
+  volumeMl                  Float?
+  internalTest              Boolean            @default(true)
+  purpose                   String?
+  status                    StudyStatus        @default(DRAFT)
+  standardId                String?
+  handedToLabAt             DateTime?
+  completedAt               DateTime?
+  cancelledAt               DateTime?
+  cancellationReason        String?
+  interruptedAt             DateTime?
+  interruptionReason        String?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  client                    Client             @relation(fields: [clientId], references: [id])
+  responsibleTechnologist   User               @relation("ResponsibleTechnologist", fields: [responsibleTechnologistId], references: [id])
+  createdBy                 User               @relation("CreatedBy", fields: [createdById], references: [id])
+  standard                  StabilityStandard? @relation(fields: [standardId], references: [id])
+  components                StudyComponent[]
+  substances                StudySubstance[]
+  criteria                  StudyCriterion[]
+  samples                   Sample[]
+  auditEvents               AuditEvent[]
+
+  @@index([status])
+  @@index([clientId])
+  @@index([responsibleTechnologistId])
+  @@index([startDate])
+}
+
+model StudyComponent {
+  id       String @id @default(cuid())
+  studyId  String
+  kind     String
+  code     String?
+  name     String
+  supplier String?
+  study    Study  @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+  @@index([studyId])
+}
+
+model StudySubstance {
+  id        String  @id @default(cuid())
+  studyId   String
+  name      String
+  present   Boolean @default(true)
+  minValue  Float?
+  maxValue  Float?
+  sortOrder Int     @default(0)
+  study     Study   @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+  @@unique([studyId, name])
+  @@index([studyId, sortOrder])
+}
+
+model TestDefinition {
+  id            String           @id @default(cuid())
+  code          String           @unique
+  name          String
+  category      String
+  valueType     TestValueType
+  unit          String?
+  active        Boolean          @default(true)
+  dictionaryKey String?
+  sortOrder     Int              @default(0)
+  criteria      StudyCriterion[]
+  sampleTests   SampleTest[]
+}
+
+model StudyCriterion {
+  id               String             @id @default(cuid())
+  studyId          String
+  testDefinitionId String
+  kind             CriterionKind
+  currentVersionId String?             @unique
+  study            Study              @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  testDefinition   TestDefinition     @relation(fields: [testDefinitionId], references: [id])
+  versions         CriterionVersion[] @relation("CriterionVersions")
+  currentVersion   CriterionVersion?  @relation("CurrentCriterionVersion", fields: [currentVersionId], references: [id])
+  sampleTests      SampleTest[]
+
+  @@unique([studyId, testDefinitionId])
+  @@index([studyId])
+}
+
+model CriterionVersion {
+  id               String         @id @default(cuid())
+  studyCriterionId String
+  version          Int
+  minValue         Float?
+  maxValue         Float?
+  expectedText     String?
+  expectedBoolean  Boolean?
+  reason           String?
+  authorId         String
+  createdAt        DateTime       @default(now())
+  studyCriterion   StudyCriterion @relation("CriterionVersions", fields: [studyCriterionId], references: [id], onDelete: Cascade)
+  currentFor       StudyCriterion? @relation("CurrentCriterionVersion")
+  author           User           @relation("CriterionVersionAuthor", fields: [authorId], references: [id])
+  resultsAtEntry   TestResult[]    @relation("CriterionAtEntry")
+
+  @@unique([studyCriterionId, version])
+  @@index([studyCriterionId])
+}
+
+model Sample {
+  id                 String                @id @default(cuid())
+  studyId            String
+  code               String
+  role               SampleRole
+  checkpointLabel    String?
+  checkpointDays     Int?
+  nominalDate        DateTime?
+  storageCondition   String
+  position           String?
+  executionStatus    SampleExecutionStatus @default(NOT_STARTED)
+  referenceStatus    ReferenceStatus?
+  activatedAt        DateTime?
+  activatedById      String?
+  sourceSampleId     String?
+  sourceTestResultId String?
+  activationReason   String?
+  completedAt        DateTime?
+  notes              String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  study              Study                 @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  initialMeasurement InitialMeasurement?
+  tests              SampleTest[]
+  microbiologyResult MicrobiologyResult?
+  sourceSample       Sample?               @relation("ReferenceSourceSample", fields: [sourceSampleId], references: [id])
+  referenceUses      Sample[]               @relation("ReferenceSourceSample")
+
+  @@unique([studyId, code])
+  @@index([studyId, nominalDate])
+  @@index([role, referenceStatus])
+}
+
+model InitialMeasurement {
+  id                         String   @id @default(cuid())
+  sampleId                   String   @unique
+  initialWeightG             Float?
+  initialPressureBar         Float?
+  weightNotPerformed         Boolean  @default(false)
+  weightNotPerformedReason   String?
+  pressureNotPerformed       Boolean  @default(false)
+  pressureNotPerformedReason String?
+  recordedById               String?
+  recordedAt                 DateTime?
+  sample                     Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+}
+
+model SampleTest {
+  id               String          @id @default(cuid())
+  sampleId         String
+  testDefinitionId String
+  studyCriterionId String?
+  required         Boolean         @default(true)
+  sortOrder        Int             @default(0)
+  sample           Sample          @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  testDefinition   TestDefinition  @relation(fields: [testDefinitionId], references: [id])
+  studyCriterion   StudyCriterion? @relation(fields: [studyCriterionId], references: [id])
+  result            TestResult?
+
+  @@unique([sampleId, testDefinitionId])
+  @@index([sampleId, sortOrder])
+  @@index([testDefinitionId])
+}
+
+model TestResult {
+  id                        String            @id @default(cuid())
+  sampleTestId              String            @unique
+  state                     ResultState       @default(RECORDED)
+  numericValue              Float?
+  textValue                 String?
+  booleanValue              Boolean?
+  notPerformedReason        String?
+  evaluationAtEntry         Evaluation        @default(NOT_APPLICABLE)
+  currentEvaluation         Evaluation        @default(NOT_APPLICABLE)
+  criterionVersionAtEntryId String?
+  authorId                  String
+  version                   Int               @default(1)
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+  sampleTest                SampleTest        @relation(fields: [sampleTestId], references: [id], onDelete: Cascade)
+  criterionVersionAtEntry   CriterionVersion? @relation("CriterionAtEntry", fields: [criterionVersionAtEntryId], references: [id])
+  author                    User              @relation("ResultAuthor", fields: [authorId], references: [id])
+  history                   TestResultHistory[]
+
+  @@index([currentEvaluation])
+}
+
+model TestResultHistory {
+  id                 String     @id @default(cuid())
+  testResultId       String
+  previousValue      String?
+  newValue           String?
+  previousEvaluation Evaluation
+  newEvaluation      Evaluation
+  authorId           String
+  createdAt          DateTime   @default(now())
+  testResult         TestResult @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  author             User       @relation("ResultHistoryAuthor", fields: [authorId], references: [id])
+
+  @@index([testResultId, createdAt])
+}
+
+model MicrobiologyResult {
+  id         String     @id @default(cuid())
+  sampleId   String     @unique
+  evaluation Evaluation
+  authorId   String
+  reportName String?
+  reportPath String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  sample     Sample     @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  author     User       @relation("MicroResultAuthor", fields: [authorId], references: [id])
+}
+
+model DictionaryEntry {
+  id        String   @id @default(cuid())
+  category  String
+  value     String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, value])
+  @@index([category, active])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  studyId   String?
+  authorId  String?
+  type      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  study     Study?   @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  author    User?    @relation("AuditEventAuthor", fields: [authorId], references: [id])
+
+  @@index([studyId, createdAt])
+}

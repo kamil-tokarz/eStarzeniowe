@@ -1,0 +1,9 @@
+.trend-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.trend-card { background: #fff; border: 1px solid var(--jp-line); border-radius: 15px; padding: 17px; min-width: 0; }
+.trend-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.trend-card-head > div { display: grid; gap: 3px; }
+.trend-card-head span { color: var(--jp-teal); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.trend-card-head strong { font-size: 15px; letter-spacing: -.02em; }
+.trend-card-head small { color: var(--jp-muted); font-size: 10px; background: var(--jp-bg); border-radius: 999px; padding: 5px 8px; }
+.trend-chart { height: 245px; width: 100%; }
+@media (max-width: 1050px) { .trend-grid { grid-template-columns: 1fr; } }

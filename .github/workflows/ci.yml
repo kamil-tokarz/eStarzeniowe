@@ -1,0 +1,52 @@
+name: eStarzeniowe CI
+
+on:
+  push:
+    branches: [main, ci/checkpoint]
+  workflow_dispatch:
+
+concurrency:
+  group: estarzeniowe-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: estarzeniowe
+          POSTGRES_USER: estarzeniowe
+          POSTGRES_PASSWORD: estarzeniowe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U estarzeniowe -d estarzeniowe"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: postgresql://estarzeniowe:estarzeniowe@localhost:5432/estarzeniowe?schema=public
+      SESSION_COOKIE_NAME: estarzeniowe_session
+      SESSION_TTL_DAYS: 14
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Create test database schema
+        run: npx prisma db push
+      - name: Seed test data
+        run: npx prisma db seed
+      - name: Verify seeded reference data
+        run: npx tsx scripts/verify-seed.ts
+      - name: Lint application
+        run: npm run lint
+      - name: Build application
+        run: npm run build

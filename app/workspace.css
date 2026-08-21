@@ -1,0 +1,7 @@
+.study-top-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 720px; }
+.results-overview { max-height: 640px; overflow: auto; }
+.results-overview thead { position: sticky; top: 0; z-index: 2; }
+.study-micro-scope { margin-top: 14px; }
+.micro-option.static { cursor: default; background: #fcfefe; }
+.micro-option.static:hover { border-color: #eef0f2; }
+@media (max-width: 1200px) { .study-top-actions { max-width: none; justify-content: flex-start; } }

@@ -1,0 +1,164 @@
+.study-form,
+.form-section,
+.form-section-head,
+.form-grid,
+.field,
+.checkbox-card,
+.criteria-sections,
+.criteria-group,
+.criterion-card,
+.criterion-toggle,
+.criterion-toggle > span,
+.criterion-info,
+.crimp-config,
+.micro-scope,
+.micro-option,
+.repeatable-block,
+.component-table,
+.substance-table {
+  text-align: left;
+}
+
+.criterion-card {
+  justify-items: stretch;
+  align-content: start;
+}
+
+.criterion-toggle {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.criterion-toggle > span {
+  width: 100%;
+  justify-items: start;
+  align-items: start;
+}
+
+.criterion-toggle strong,
+.criterion-toggle small,
+.criterion-info,
+.field,
+.field input,
+.field select,
+.field textarea,
+.component-row input,
+.component-row select,
+.substance-row input,
+.substance-row select {
+  text-align: left;
+}
+
+.repeatable-block {
+  display: grid;
+  gap: 10px;
+}
+
+.repeatable-table {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.component-row {
+  grid-template-columns: minmax(190px, 1.3fr) minmax(120px, .8fr) minmax(240px, 1.6fr) minmax(180px, 1.2fr) 46px;
+  min-width: 900px;
+}
+
+.component-row > *,
+.substance-row > * {
+  min-width: 0;
+}
+
+.component-row input,
+.component-row select,
+.substance-row input,
+.substance-row select {
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  padding: 10px 12px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  border-right: 1px solid var(--jp-line) !important;
+  background: #fff;
+  color: var(--jp-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+}
+
+.component-row input:focus,
+.component-row select:focus,
+.substance-row input:focus,
+.substance-row select:focus {
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px rgba(0, 140, 141, .28);
+}
+
+.component-head,
+.substance-head {
+  align-items: stretch;
+}
+
+.component-head span,
+.substance-head span {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 36px;
+  text-align: left;
+}
+
+.row-remove {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  min-height: 43px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #fff;
+  color: #929aa4;
+  cursor: pointer;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.row-remove:hover {
+  background: var(--jp-danger-soft);
+  color: var(--jp-danger);
+}
+
+.add-row-button {
+  justify-self: start;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+
+.substance-row {
+  grid-template-columns: minmax(220px, 1.8fr) minmax(120px, .75fr) minmax(120px, .75fr) minmax(120px, .75fr) 46px;
+  min-width: 760px;
+}
+
+.substance-row input:disabled {
+  background: #f4f6f7;
+  color: #a1a8b0;
+}
+
+.criteria-grid {
+  align-items: stretch;
+}
+
+.micro-option {
+  justify-content: flex-start;
+}
+
+@media (max-width: 1100px) {
+  .component-row { min-width: 860px; }
+  .substance-row { min-width: 720px; }
+}
