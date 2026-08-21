@@ -3,6 +3,7 @@ import "./globals.css";
 import "./application.css";
 import "./operational.css";
 import "./attention.css";
+import "./catalog.css";
 
 export const metadata: Metadata = {
   title: "eStarzeniowe · JagoPro",
