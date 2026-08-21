@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { criterionCatalog, criterionGroups } from "@/lib/criterion-catalog";
+import { RepeatableComponentTable, RepeatableSubstanceTable } from "@/components/repeatable-tables";
 
 type Option = { id: string; name: string };
 
@@ -30,6 +31,8 @@ export function StudyForm({
   const fill = fillWeight === "" ? null : Number(fillWeight);
   const gas = gasWeight === "" ? null : Number(gasWeight);
   const totalWeight = fill != null && Number.isFinite(fill) && (!aerosol || (gas != null && Number.isFinite(gas))) ? fill + (aerosol ? gas ?? 0 : 0) : null;
+  const purposeValues = dictionaryValues.study_purpose ?? [];
+  const gasValues = dictionaryValues.gas_type ?? [];
 
   return (
     <form method="post" action="/api/studies" className="study-form">
@@ -41,7 +44,7 @@ export function StudyForm({
           <label className="field">Technolog odpowiedzialny *<select name="responsibleTechnologistId" required defaultValue={defaultTechnologistId}>{technologists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
           <label className="field">Numer ETS<input name="etsNumber" placeholder="opcjonalnie" /></label>
           <label className="field">Typ badania<select name="testType" defaultValue="internal"><option value="internal">Wewnętrzne</option><option value="customer">Dla klienta</option></select></label>
-          <label className="field field-wide">Cel testów<textarea name="purpose" rows={3} placeholder="Krótko: po co wykonujemy badanie?" /></label>
+          <label className="field field-wide">Cel testów<select name="purpose" defaultValue=""><option value="">Wybierz cel testów</option>{purposeValues.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         </div>
       </section>
 
@@ -55,15 +58,12 @@ export function StudyForm({
           <label className="field">Waga wsadu [g]<input type="number" step="0.01" readOnly value={totalWeight ?? ""} placeholder="nastaw + gaz" /></label>
           <label className="checkbox-card"><input name="aerosol" type="checkbox" checked={aerosol} onChange={(event) => { setAerosol(event.target.checked); if (!event.target.checked) setGasWeight(""); }} /><span><strong>Aerozol</strong><small>Wymaga pomiaru ciśnienia początkowego i bieżącego.</small></span></label>
         </div>
-        {aerosol && <div className="form-grid form-grid-3 aerosol-fields"><label className="field">Rodzaj gazu<input name="gasType" placeholder="np. LPG / N₂" /></label><label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" value={gasWeight} onChange={(event) => setGasWeight(event.target.value)} /></label></div>}
+        {aerosol && <div className="form-grid form-grid-3 aerosol-fields"><label className="field">Rodzaj gazu<select name="gasType" defaultValue=""><option value="">Wybierz rodzaj gazu</option>{gasValues.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label className="field">Waga gazu [g]<input name="gasWeightG" type="number" step="0.01" min="0" value={gasWeight} onChange={(event) => setGasWeight(event.target.value)} /></label></div>}
       </section>
 
       <section className="form-section">
-        <div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Elementy produktu i opakowania. Puste wiersze zostaną pominięte.</p></div></div>
-        <div className="component-table">
-          <div className="component-row component-head"><span>Rodzaj</span><span>Kod</span><span>Nazwa</span><span>Dostawca</span></div>
-          {[1, 2, 3, 4, 5].map((index) => <div className="component-row" key={index}><select name={`componentKind_${index}`} defaultValue=""><option value="">Wybierz rodzaj</option>{componentKinds.map((value) => <option key={value} value={value}>{value}</option>)}</select><input name={`componentCode_${index}`} placeholder="Kod" /><input name={`componentName_${index}`} placeholder="Nazwa komponentu" /><input name={`componentSupplier_${index}`} placeholder="Dostawca" /></div>)}
-        </div>
+        <div className="form-section-head"><span className="step-number">03</span><div><h2>Komponenty</h2><p>Domyślnie jeden wiersz. Dodaj tyle komponentów, ile faktycznie występuje w badaniu.</p></div></div>
+        <RepeatableComponentTable componentKinds={componentKinds} />
       </section>
 
       <section className="form-section">
@@ -95,11 +95,8 @@ export function StudyForm({
 
           <div className="criteria-group">
             <div className="criteria-group-title">Zawartość substancji</div>
-            <p className="subtle">Każdy wiersz tworzy osobne badanie z własnym zakresem i pełną oceną OK/NOK.</p>
-            <div className="substance-table">
-              <div className="substance-row substance-head"><span>Substancja</span><span>Minimum [%]</span><span>Maksimum [%]</span></div>
-              {[1, 2, 3, 4, 5].map((index) => <div className="substance-row" key={index}><input name={`substanceName_${index}`} placeholder="np. Etanol" /><input name={`substanceMin_${index}`} type="number" step="any" placeholder="min" /><input name={`substanceMax_${index}`} type="number" step="any" placeholder="max" /></div>)}
-            </div>
+            <p className="subtle">Struktura zgodna z BPM: substancja, czy występuje oraz zakres MIN–MAX. Liczba wierszy jest dowolna.</p>
+            <RepeatableSubstanceTable />
           </div>
         </div>
       </section>
@@ -113,8 +110,8 @@ export function StudyForm({
       </section>
 
       <section className="form-section">
-        <div className="form-section-head"><span className="step-number">06</span><div><h2>Standard stabilności</h2><p>Standard definiuje wyłącznie fizyczny plan próbek, warunki przechowywania i stałe offsety dni.</p></div></div>
-        <label className="field field-wide">Standard *<select name="standardId" required defaultValue={standards[0]?.id ?? ""}><option value="" disabled>{standards.length ? "Wybierz standard" : "Brak aktywnych standardów"}</option>{standards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <div className="form-section-head"><span className="step-number">06</span><div><h2>Standard stabilności</h2><p>Standard definiuje fizyczny plan próbek, warunki przechowywania i stałe offsety dni.</p></div></div>
+        <label className="field field-wide">Standard *<select name="standardId" required defaultValue=""><option value="" disabled>{standards.length ? "Wybierz standard" : "Brak aktywnych standardów"}</option>{standards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       </section>
 
       <div className="sticky-form-actions"><div><strong>Zapis jako wersja robocza</strong><span>Numer badania zostanie nadany automatycznie.</span></div><button className="btn btn-primary btn-large" type="submit" disabled={!standards.length}>Utwórz zlecenie</button></div>
