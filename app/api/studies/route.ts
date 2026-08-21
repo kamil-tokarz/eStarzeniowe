@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         if (!dictionaryMap.get("component_kind")?.has(component.kind)) throw new Error(`Nieaktywny rodzaj komponentu: ${component.kind}`);
       }
 
-      await tx.$queryRawUnsafe("SELECT pg_advisory_xact_lock($1)", year);
+      await tx.$queryRawUnsafe<Array<{ locked: number }>>("SELECT 1 AS locked FROM pg_advisory_xact_lock($1)", year);
       const prefix = `ES-${year}-`;
       const latest = await tx.study.findFirst({ where: { studyNumber: { startsWith: prefix } }, orderBy: { studyNumber: "desc" }, select: { studyNumber: true } });
       const lastSequence = latest ? Number(latest.studyNumber.slice(-4)) || 0 : 0;
