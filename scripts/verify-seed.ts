@@ -18,11 +18,14 @@ const expectedStandards: Record<string, number> = {
 };
 
 async function main() {
-  const microbiology = await prisma.dictionaryEntry.findMany({
-    where: { category: "microbiology", active: true },
-    orderBy: { sortOrder: "asc" },
-  });
-  assert.equal(microbiology.length, 24, `Oczekiwano 24 aktywnych pozycji mikrobiologii, jest ${microbiology.length}.`);
+  const microbiology = await prisma.dictionaryEntry.count({ where: { category: "microbiology", active: true } });
+  assert.equal(microbiology, 24, `Oczekiwano 24 aktywnych pozycji mikrobiologii, jest ${microbiology}.`);
+
+  const gasTypes = await prisma.dictionaryEntry.count({ where: { category: "gas_type", active: true } });
+  assert.equal(gasTypes, 14, `Oczekiwano 14 rodzajów gazu z BPM, jest ${gasTypes}.`);
+
+  const purposes = await prisma.dictionaryEntry.count({ where: { category: "study_purpose", active: true } });
+  assert.equal(purposes, 8, `Oczekiwano 8 celów testów z BPM, jest ${purposes}.`);
 
   const standards = await prisma.stabilityStandard.findMany({
     where: { name: { in: Object.keys(expectedStandards) } },
@@ -34,35 +37,38 @@ async function main() {
   for (const [name, expectedDefinitions] of Object.entries(expectedStandards)) {
     const standard = standards.find((item) => item.name === name);
     assert.ok(standard, `Brakuje standardu: ${name}.`);
-    assert.equal(standard.status, StandardStatus.DRAFT, `${name} powinien pozostać DRAFT do zatwierdzenia offsetów.`);
-    assert.equal(standard.locked, false, `${name} nie powinien być zablokowany przed pierwszym użyciem.`);
+    assert.equal(standard.status, StandardStatus.ACTIVE, `${name} powinien być dostępny w formularzu testowym.`);
+    assert.equal(standard.locked, true, `${name} powinien być chroniony przed przypadkową zmianą po aktywacji.`);
     assert.equal(standard._count.definitions, expectedDefinitions, `${name}: oczekiwano ${expectedDefinitions} definicji, jest ${standard._count.definitions}.`);
     definitionCount += standard._count.definitions;
   }
   assert.equal(definitionCount, 217, `Oczekiwano 217 definicji próbek, jest ${definitionCount}.`);
 
-  const referenceWithoutDate = await prisma.standardSampleDefinition.count({
+  const referenceWithDate = await prisma.standardSampleDefinition.count({
     where: {
       standard: { name: { in: Object.keys(expectedStandards) } },
       role: "REFERENCE",
       checkpointDays: { not: null },
     },
   });
-  assert.equal(referenceWithoutDate, 0, "Próbki RF nie mogą mieć offsetu terminu.");
+  assert.equal(referenceWithDate, 0, "Próbki RF nie mogą mieć offsetu terminu.");
 
-  const microWithDate = await prisma.standardSampleDefinition.count({
+  const microWithoutDate = await prisma.standardSampleDefinition.count({
     where: {
       standard: { name: { in: Object.keys(expectedStandards) } },
       role: "MICROBIOLOGY",
       checkpointDays: null,
     },
   });
-  assert.equal(microWithDate, 0, "Próbki mikrobiologiczne muszą mieć stały offset dni.");
+  assert.equal(microWithoutDate, 0, "Próbki mikrobiologiczne muszą mieć stały offset dni.");
 
   const users = await prisma.user.findMany({ where: { login: { in: ["admin", "technolog", "laborant"] }, active: true } });
   assert.equal(users.length, 3, "Brakuje któregoś z trzech kont testowych.");
 
-  console.log("Seed verification OK: 24 mikro, 7 standardów, 217 definicji próbek, RF bez terminów.");
+  const studies = await prisma.study.count();
+  assert.equal(studies, 0, `Świeży seed ma startować bez zleceń demonstracyjnych; znaleziono ${studies}.`);
+
+  console.log("Seed verification OK: 0 zleceń demo, 14 gazów, 8 celów, 24 mikro, 7 aktywnych standardów, 217 definicji próbek.");
 }
 
 main().finally(() => prisma.$disconnect());
