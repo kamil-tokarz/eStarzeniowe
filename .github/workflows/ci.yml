@@ -46,6 +46,8 @@ jobs:
         run: npx prisma db push
       - name: Seed test data
         run: npx prisma db seed
+      - name: Verify seeded reference data
+        run: npx tsx scripts/verify-seed.ts
       - name: Lint application
         run: npm run lint
       - name: Build application
