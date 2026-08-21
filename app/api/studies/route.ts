@@ -20,6 +20,14 @@ function numberOrNull(formData: FormData, key: string) {
   if (!raw) return null;
   const value = Number(raw);
   if (!Number.isFinite(value)) throw new Error(`Nieprawidłowa wartość: ${key}`);
+  if (value < 0) throw new Error(`Wartość nie może być ujemna: ${key}`);
+  return value;
+}
+
+function dateValue(formData: FormData, key: string) {
+  const raw = required(formData, key);
+  const value = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(value.getTime())) throw new Error(`Nieprawidłowa data: ${key}`);
   return value;
 }
 
@@ -46,33 +54,71 @@ export async function POST(request: NextRequest) {
     const clientId = required(formData, "clientId");
     const responsibleTechnologistId = required(formData, "responsibleTechnologistId");
     const standardId = required(formData, "standardId");
-    const productionDate = new Date(`${required(formData, "productionDate")}T12:00:00`);
-    const startDate = new Date(`${required(formData, "startDate")}T12:00:00`);
+    const productionDate = dateValue(formData, "productionDate");
+    const startDate = dateValue(formData, "startDate");
     const aerosol = formData.get("aerosol") === "on";
+    const gasWeightG = aerosol ? numberOrNull(formData, "gasWeightG") : null;
+    const fillWeightG = numberOrNull(formData, "fillWeightG");
+    const volumeMl = numberOrNull(formData, "volumeMl");
+    const totalWeightG = fillWeightG != null && (!aerosol || gasWeightG != null) ? fillWeightG + (gasWeightG ?? 0) : null;
     const selectedCodes = criterionCatalog.filter((item) => formData.get(`criterion_${item.code}`) === "on").map((item) => item.code);
-    const microbiologyScope = formData.getAll("microTests").map((item) => String(item).trim()).filter(Boolean);
+    const microbiologyScope = [...new Set(formData.getAll("microTests").map((item) => String(item).trim()).filter(Boolean))];
+
+    const components = Array.from({ length: 5 }, (_, index) => index + 1).map((index) => ({
+      kind: text(formData, `componentKind_${index}`),
+      code: text(formData, `componentCode_${index}`),
+      name: text(formData, `componentName_${index}`),
+      supplier: text(formData, `componentSupplier_${index}`),
+    })).filter((row) => row.kind || row.code || row.name || row.supplier);
+    for (const row of components) {
+      if (!row.kind || !row.name) throw new Error("Każdy uzupełniony komponent musi mieć rodzaj i nazwę.");
+    }
 
     const substances = Array.from({ length: 5 }, (_, index) => index + 1).map((index) => ({
       name: text(formData, `substanceName_${index}`),
       min: numberOrNull(formData, `substanceMin_${index}`),
       max: numberOrNull(formData, `substanceMax_${index}`),
-    })).filter((row) => row.name);
+    })).filter((row) => row.name || row.min != null || row.max != null);
 
     if (selectedCodes.length === 0 && substances.length === 0) throw new Error("Wybierz co najmniej jedno kryterium akceptacji.");
     for (const row of substances) {
-      if (row.min == null || row.max == null || row.min > row.max) throw new Error(`Podaj poprawny zakres dla substancji: ${row.name}.`);
+      if (!row.name || row.min == null || row.max == null || row.min > row.max) throw new Error(`Podaj nazwę i poprawny zakres dla każdej substancji.`);
     }
 
     const year = new Date().getFullYear();
     const study = await prisma.$transaction(async (tx) => {
+      const [standard, client, technologist, sourceDictionaryEntries] = await Promise.all([
+        tx.stabilityStandard.findUnique({ where: { id: standardId } }),
+        tx.client.findUnique({ where: { id: clientId } }),
+        tx.user.findUnique({ where: { id: responsibleTechnologistId } }),
+        tx.dictionaryEntry.findMany({
+          where: { active: true, category: { in: ["appearance", "odor", "color", "spray", "crimp_width_setup", "crimp_height_setup", "microbiology", "component_kind"] } },
+          select: { category: true, value: true },
+        }),
+      ]);
+
+      if (!standard || standard.status !== StandardStatus.ACTIVE) throw new Error("Wybrany standard nie jest aktywny.");
+      if (!client || !client.active) throw new Error("Wybrany klient nie jest aktywny.");
+      if (!technologist || !technologist.active || technologist.role !== UserRole.TECHNOLOGIST) throw new Error("Wybrany Technolog nie jest aktywny.");
+
+      const dictionaryMap = new Map<string, Set<string>>();
+      for (const entry of sourceDictionaryEntries) {
+        const values = dictionaryMap.get(entry.category) ?? new Set<string>();
+        values.add(entry.value);
+        dictionaryMap.set(entry.category, values);
+      }
+      for (const value of microbiologyScope) {
+        if (!dictionaryMap.get("microbiology")?.has(value)) throw new Error(`Nieaktywne badanie mikrobiologiczne: ${value}`);
+      }
+      for (const component of components) {
+        if (!dictionaryMap.get("component_kind")?.has(component.kind)) throw new Error(`Nieaktywny rodzaj komponentu: ${component.kind}`);
+      }
+
       await tx.$queryRawUnsafe("SELECT pg_advisory_xact_lock($1)", year);
       const prefix = `ES-${year}-`;
       const latest = await tx.study.findFirst({ where: { studyNumber: { startsWith: prefix } }, orderBy: { studyNumber: "desc" }, select: { studyNumber: true } });
       const lastSequence = latest ? Number(latest.studyNumber.slice(-4)) || 0 : 0;
       const studyNumber = `${prefix}${String(lastSequence + 1).padStart(4, "0")}`;
-
-      const standard = await tx.stabilityStandard.findUnique({ where: { id: standardId } });
-      if (!standard || standard.status !== StandardStatus.ACTIVE) throw new Error("Wybrany standard nie jest aktywny.");
 
       const created = await tx.study.create({
         data: {
@@ -86,10 +132,10 @@ export async function POST(request: NextRequest) {
           createdById: user.id,
           aerosol,
           gasType: aerosol ? text(formData, "gasType") || null : null,
-          gasWeightG: aerosol ? numberOrNull(formData, "gasWeightG") : null,
-          fillWeightG: numberOrNull(formData, "fillWeightG"),
-          totalWeightG: numberOrNull(formData, "totalWeightG"),
-          volumeMl: numberOrNull(formData, "volumeMl"),
+          gasWeightG,
+          fillWeightG,
+          totalWeightG,
+          volumeMl,
           internalTest: text(formData, "testType") !== "customer",
           purpose: text(formData, "purpose") || null,
           status: StudyStatus.DRAFT,
@@ -97,28 +143,18 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      const components = Array.from({ length: 5 }, (_, index) => index + 1).map((index) => ({
-        kind: text(formData, `componentKind_${index}`),
-        code: text(formData, `componentCode_${index}`),
-        name: text(formData, `componentName_${index}`),
-        supplier: text(formData, `componentSupplier_${index}`),
-      })).filter((row) => row.kind && row.name);
       if (components.length) {
-        await tx.studyComponent.createMany({
-          data: components.map((row) => ({ studyId: created.id, kind: row.kind, code: row.code || null, name: row.name, supplier: row.supplier || null })),
-        });
+        await tx.studyComponent.createMany({ data: components.map((row) => ({ studyId: created.id, kind: row.kind, code: row.code || null, name: row.name, supplier: row.supplier || null })) });
       }
       if (microbiologyScope.length) {
-        await tx.studyComponent.createMany({
-          data: microbiologyScope.map((name, index) => ({ studyId: created.id, kind: "Badanie mikrobiologiczne", code: `MICRO-${String(index + 1).padStart(2, "0")}`, name })),
-        });
+        await tx.studyComponent.createMany({ data: microbiologyScope.map((name, index) => ({ studyId: created.id, kind: "Badanie mikrobiologiczne", code: `MICRO-${String(index + 1).padStart(2, "0")}`, name })) });
       }
 
-      const definitions = await tx.testDefinition.findMany({ where: { code: { in: selectedCodes } } });
+      const definitions = await tx.testDefinition.findMany({ where: { active: true, code: { in: selectedCodes } } });
       const definitionMap = new Map(definitions.map((definition) => [definition.code, definition]));
       for (const item of criterionCatalog.filter((catalogItem) => selectedCodes.includes(catalogItem.code))) {
         const definition = definitionMap.get(item.code);
-        if (!definition) throw new Error(`Brakuje definicji badania: ${item.label}.`);
+        if (!definition) throw new Error(`Brakuje aktywnej definicji badania: ${item.label}.`);
 
         let kind: CriterionKind;
         let minValue: number | null = null;
@@ -138,12 +174,14 @@ export async function POST(request: NextRequest) {
         } else if (item.input === "expected") {
           kind = CriterionKind.EXPECTED_VALUE;
           expectedText = required(formData, `${item.code}_expected`);
+          if (!item.dictionaryKey || !dictionaryMap.get(item.dictionaryKey)?.has(expectedText)) throw new Error(`Wybierz aktywną wartość słownikową dla: ${item.label}.`);
         } else if (item.input === "boolean") {
           kind = CriterionKind.BOOLEAN_EXPECTED;
           expectedBoolean = true;
         } else {
           kind = CriterionKind.RANGE;
           const preset = required(formData, `${item.code}_preset`);
+          if (!item.dictionaryKey || !dictionaryMap.get(item.dictionaryKey)?.has(preset)) throw new Error(`Wybierz aktywną konfigurację dla: ${item.label}.`);
           const parsed = preset === "INNE" ? null : parsePresetRange(preset);
           minValue = parsed?.min ?? numberOrNull(formData, `${item.code}_min`);
           maxValue = parsed?.max ?? numberOrNull(formData, `${item.code}_max`);
@@ -152,9 +190,7 @@ export async function POST(request: NextRequest) {
         }
 
         const criterion = await tx.studyCriterion.create({ data: { studyId: created.id, testDefinitionId: definition.id, kind } });
-        const version = await tx.criterionVersion.create({
-          data: { studyCriterionId: criterion.id, version: 1, minValue, maxValue, expectedText, expectedBoolean, authorId: user.id },
-        });
+        const version = await tx.criterionVersion.create({ data: { studyCriterionId: criterion.id, version: 1, minValue, maxValue, expectedText, expectedBoolean, authorId: user.id } });
         await tx.studyCriterion.update({ where: { id: criterion.id }, data: { currentVersionId: version.id } });
       }
 
@@ -166,9 +202,7 @@ export async function POST(request: NextRequest) {
           create: { code, name: `Zawartość: ${row.name}`, category: "Zawartość substancji", valueType: TestValueType.NUMBER, unit: "%", active: true, sortOrder: 1000 },
         });
         const criterion = await tx.studyCriterion.create({ data: { studyId: created.id, testDefinitionId: definition.id, kind: CriterionKind.RANGE } });
-        const version = await tx.criterionVersion.create({
-          data: { studyCriterionId: criterion.id, version: 1, minValue: row.min, maxValue: row.max, expectedText: row.name, authorId: user.id },
-        });
+        const version = await tx.criterionVersion.create({ data: { studyCriterionId: criterion.id, version: 1, minValue: row.min, maxValue: row.max, expectedText: row.name, authorId: user.id } });
         await tx.studyCriterion.update({ where: { id: criterion.id }, data: { currentVersionId: version.id } });
       }
 
@@ -178,6 +212,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.redirect(new URL(`/studies/${study.id}`, publicOrigin(request)), 303);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Nie udało się utworzyć zlecenia." }, { status: 400 });
+    const message = error instanceof Error ? error.message : "Nie udało się utworzyć zlecenia.";
+    return NextResponse.redirect(new URL(`/studies/new?error=${encodeURIComponent(message)}`, publicOrigin(request)), 303);
   }
 }
