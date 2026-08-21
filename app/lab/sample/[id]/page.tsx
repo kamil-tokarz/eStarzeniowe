@@ -4,7 +4,7 @@ import { Evaluation, ReferenceStatus, ResultState, SampleRole, StudyStatus, Test
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/app-shell";
-import { saveInitialMeasurementAction, saveMicrobiologyResultAction, saveSampleResultsAction } from "@/app/lab/actions";
+import { saveInitialMeasurementAction, saveSampleResultsAction } from "@/app/lab/actions";
 
 function initialComplete(aerosol: boolean, m: { initialWeightG: number | null; initialPressureBar: number | null; weightNotPerformed: boolean; weightNotPerformedReason: string | null; pressureNotPerformed: boolean; pressureNotPerformedReason: string | null } | null) {
   if (!m) return false;
@@ -98,10 +98,12 @@ export default async function LabSamplePage({ params, searchParams }: { params: 
       {allInitialDone && sample.study.status === StudyStatus.ACTIVE && sample.role === SampleRole.MICROBIOLOGY && (
         <section className="section">
           <div className="section-head"><div><div className="eyebrow">Etap 2</div><div className="section-title">Mikrobiologia zewnętrzna</div><div className="subtle">Jedna wspólna ocena OK/NOK dla próbki. Zakres badań pozostaje informacją w zleceniu.</div></div></div>
-          <form action={saveMicrobiologyResultAction} className="micro-card">
+          <form method="post" action="/api/lab/microbiology" encType="multipart/form-data" className="micro-card">
             <input type="hidden" name="sampleId" value={sample.id} />
             <label className="field">Ocena *<select name="evaluation" defaultValue={sample.microbiologyResult?.evaluation ?? Evaluation.OK} disabled={!canEdit}><option value={Evaluation.OK}>OK</option><option value={Evaluation.NOK}>NOK</option></select></label>
             <label className="field field-wide">Nazwa / numer raportu<input name="reportName" defaultValue={sample.microbiologyResult?.reportName ?? ""} placeholder="np. Raport LAB-2026-001" disabled={!canEdit} /></label>
+            <label className="field field-wide">Załącznik raportu<input name="reportFile" type="file" accept="application/pdf,image/png,image/jpeg" disabled={!canEdit} /><small>Opcjonalnie PDF, PNG lub JPG · maks. 10 MB.</small></label>
+            {sample.microbiologyResult?.reportPath && <div className="micro-report-link"><span>Aktualny załącznik:</span><a className="section-link" href={`/api/lab/microbiology/${sample.id}/report`} target="_blank" rel="noreferrer">{sample.microbiologyResult.reportName || "Otwórz raport"} ↗</a></div>}
             {canEdit && <button className="btn btn-primary" type="submit">Zapisz wynik mikrobiologii</button>}
           </form>
         </section>
