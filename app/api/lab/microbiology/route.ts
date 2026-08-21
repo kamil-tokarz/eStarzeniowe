@@ -2,14 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Evaluation, ReferenceStatus, SampleExecutionStatus, SampleRole, StudyStatus, UserRole } from "@/generated/prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { publicUrl } from "@/lib/request-origin";
 import { deleteReportFile, saveReportFile } from "@/lib/storage";
-
-function publicOrigin(request: NextRequest) {
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  if (forwardedHost) return `${forwardedProto || "https"}://${forwardedHost}`;
-  return request.nextUrl.origin;
-}
 
 function initialComplete(aerosol: boolean, m: {
   initialWeightG: number | null;
@@ -47,10 +41,11 @@ export async function POST(request: NextRequest) {
   const sampleId = String(formData.get("sampleId") ?? "").trim();
   const evaluationRaw = String(formData.get("evaluation") ?? "").trim();
   const reportNameRaw = String(formData.get("reportName") ?? "").trim();
-  if (!sampleId || ![Evaluation.OK, Evaluation.NOK].includes(evaluationRaw as Evaluation)) {
-    return NextResponse.json({ error: "Nieprawidłowe dane wyniku mikrobiologii." }, { status: 400 });
+  if (!sampleId) return NextResponse.redirect(publicUrl(request, "/lab?error=micro"), 303);
+  if (evaluationRaw !== Evaluation.OK && evaluationRaw !== Evaluation.NOK) {
+    return NextResponse.redirect(publicUrl(request, `/lab/sample/${sampleId}?error=micro`), 303);
   }
-  const evaluation = evaluationRaw as Evaluation;
+  const evaluation: Evaluation = evaluationRaw;
 
   const sample = await prisma.sample.findUnique({
     where: { id: sampleId },
@@ -60,10 +55,10 @@ export async function POST(request: NextRequest) {
     },
   });
   if (!sample || sample.role !== SampleRole.MICROBIOLOGY || sample.study.status !== StudyStatus.ACTIVE) {
-    return NextResponse.json({ error: "To nie jest aktywna próbka mikrobiologiczna." }, { status: 400 });
+    return NextResponse.redirect(publicUrl(request, `/lab/sample/${sampleId}?error=inactive`), 303);
   }
   if (!sample.study.samples.every((row) => initialComplete(sample.study.aerosol, row.initialMeasurement))) {
-    return NextResponse.json({ error: "Najpierw zakończ badania wstępne wszystkich próbek." }, { status: 400 });
+    return NextResponse.redirect(publicUrl(request, `/lab/sample/${sampleId}?error=initials`), 303);
   }
 
   const fileValue = formData.get("reportFile");
@@ -72,7 +67,8 @@ export async function POST(request: NextRequest) {
   try {
     if (file) uploaded = await saveReportFile(file, sampleId);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Nie udało się zapisać raportu." }, { status: 400 });
+    const message = error instanceof Error ? error.message : "Nie udało się zapisać raportu.";
+    return NextResponse.redirect(publicUrl(request, `/lab/sample/${sampleId}?error=${encodeURIComponent(message)}`), 303);
   }
 
   const oldPath = sample.microbiologyResult?.reportPath ?? null;
@@ -104,12 +100,12 @@ export async function POST(request: NextRequest) {
         },
       }),
     ]);
-  } catch (error) {
+  } catch {
     if (uploaded) await deleteReportFile(uploaded.storageName);
-    throw error;
+    return NextResponse.redirect(publicUrl(request, `/lab/sample/${sampleId}?error=micro`), 303);
   }
 
   if (uploaded && oldPath && oldPath !== uploaded.storageName) await deleteReportFile(oldPath);
   await refreshStudyCompletion(sample.studyId);
-  return NextResponse.redirect(new URL(`/lab/sample/${sampleId}?saved=1`, publicOrigin(request)), 303);
+  return NextResponse.redirect(publicUrl(request, `/lab/sample/${sampleId}?saved=micro`), 303);
 }
