@@ -2,12 +2,11 @@ name: eStarzeniowe CI
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: [main, ci/checkpoint]
+  workflow_dispatch:
 
 concurrency:
-  group: estarzeniowe-ci-${{ github.event.pull_request.number || github.ref }}
+  group: estarzeniowe-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
